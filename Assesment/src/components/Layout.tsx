@@ -30,10 +30,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <Container>
       <Nav>
-        <Link to="/blogs">Blogs</Link>
         {user ? (
           <>
-            <Link to="/blogs/create">Create Blog</Link>
             <button onClick={() => navigate('/logout')}>Logout</button>
           </>
         ) : (
