@@ -30,7 +30,8 @@ const initialState: BlogsState = {
 
 export const fetchBlogs = createAsyncThunk(
   'blogs/fetchBlogs',
-  async ({ page = 1, limit = 10 }: { page?: number; limit?: number }) => {
+  async ({ page = 1, limit = 10 }: { page?: number; limit?: number }, { getState }) => {
+    getState() as { blogs: BlogsState };
     const from = (page - 1) * limit;
     const to = from + limit - 1;
     const { data, error, count } = await supabase
@@ -42,6 +43,35 @@ export const fetchBlogs = createAsyncThunk(
     if (error) throw error;
     const totalPages = Math.ceil((count || 0) / limit);
     return { blogs: data || [], totalPages, hasMore: page < totalPages };
+  }
+);
+
+export const createBlog = createAsyncThunk(
+  'blogs/createBlog',
+  async ({ title, content }: { title: string; content: string }) => {
+    const { data, error } = await supabase
+      .from('blogs')
+      .insert([{ title, content }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+);
+
+export const updateBlog = createAsyncThunk(
+  'blogs/updateBlog',
+  async ({ id, title, content }: { id: string; title: string; content: string }) => {
+    const { data, error } = await supabase
+      .from('blogs')
+      .update({ title, content, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
   }
 );
 
@@ -57,7 +87,7 @@ const blogsSlice = createSlice({
     addBlog: (state, action: PayloadAction<Blog>) => {
       state.list.unshift(action.payload);
     },
-    updateBlog: (state, action: PayloadAction<Blog>) => {
+    updateBlogInList: (state, action: PayloadAction<Blog>) => {
       const index = state.list.findIndex(blog => blog.id === action.payload.id);
       if (index !== -1) {
         state.list[index] = action.payload;
@@ -96,9 +126,18 @@ const blogsSlice = createSlice({
       .addCase(fetchBlogs.rejected, (state, action) => {
         state.error = action.error.message || 'Failed to fetch blogs';
         state.loading = false;
+      })
+      .addCase(createBlog.fulfilled, (state, action) => {
+        state.list.unshift(action.payload);
+      })
+      .addCase(updateBlog.fulfilled, (state, action) => {
+        const index = state.list.findIndex(blog => blog.id === action.payload.id);
+        if (index !== -1) {
+          state.list[index] = action.payload;
+        }
       });
   },
 });
 
-export const { setBlogs, addBlog, updateBlog, removeBlog, setLoading, setError, setPage } = blogsSlice.actions;
+export const { setBlogs, addBlog, updateBlogInList, removeBlog, setLoading, setError, setPage } = blogsSlice.actions;
 export default blogsSlice.reducer;
