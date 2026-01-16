@@ -12,6 +12,14 @@ const AuthContainer = styled.div`
   align-items: center;
   justify-content: center;
   padding: 20px;
+
+  @media (max-width: 768px) {
+    padding: 16px;
+  }
+
+  @media (max-width: 480px) {
+    padding: 12px;
+  }
 `;
 
 const AuthCard = styled.div`
@@ -22,6 +30,15 @@ const AuthCard = styled.div`
   width: 100%;
   max-width: 400px;
   border: 1px solid rgba(0,0,0,0.05);
+
+  @media (max-width: 768px) {
+    padding: 40px;
+  }
+
+  @media (max-width: 480px) {
+    padding: 24px;
+    border-radius: 8px;
+  }
 `;
 
 const AuthHeader = styled.div`
@@ -39,12 +56,40 @@ const AuthHeader = styled.div`
     margin: 0;
     font-size: 1rem;
   }
+
+  @media (max-width: 768px) {
+    margin-bottom: 30px;
+
+    h1 {
+      font-size: 1.75rem;
+    }
+
+    p {
+      font-size: 0.95rem;
+    }
+  }
+
+  @media (max-width: 480px) {
+    margin-bottom: 24px;
+
+    h1 {
+      font-size: 1.5rem;
+    }
+
+    p {
+      font-size: 0.9rem;
+    }
+  }
 `;
 
 const Form = styled.form`
   display: flex;
   flex-direction: column;
   gap: 20px;
+
+  @media (max-width: 480px) {
+    gap: 16px;
+  }
 `;
 
 const FormGroup = styled.div`
@@ -57,6 +102,14 @@ const FormGroup = styled.div`
     color: #2d3748;
     font-size: 14px;
   }
+
+  @media (max-width: 480px) {
+    gap: 6px;
+
+    label {
+      font-size: 13px;
+    }
+  }
 `;
 
 const ErrorAlert = styled.div`
@@ -68,6 +121,11 @@ const ErrorAlert = styled.div`
   font-size: 14px;
   font-weight: 500;
   margin-bottom: 10px;
+
+  @media (max-width: 480px) {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
 `;
 
 const SubmitBtn = styled.button`
@@ -81,6 +139,11 @@ const SubmitBtn = styled.button`
   &:hover:not(:disabled) {
     transform: translateY(-2px);
     box-shadow: 0 8px 12px rgba(90, 103, 216, 0.35);
+  }
+
+  @media (max-width: 480px) {
+    padding: 10px 16px;
+    font-size: 14px;
   }
 `;
 
@@ -98,6 +161,11 @@ const SignupLink = styled.p`
     &:hover {
       text-decoration: underline;
     }
+  }
+
+  @media (max-width: 480px) {
+    margin-top: 16px;
+    font-size: 13px;
   }
 `;
 

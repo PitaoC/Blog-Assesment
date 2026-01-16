@@ -19,6 +19,30 @@ const PageHeader = styled.div`
     font-size: 1.1rem;
     margin: 0;
   }
+
+  @media (max-width: 768px) {
+    margin-bottom: 30px;
+
+    h1 {
+      font-size: 2rem;
+    }
+
+    p {
+      font-size: 1rem;
+    }
+  }
+
+  @media (max-width: 480px) {
+    margin-bottom: 20px;
+
+    h1 {
+      font-size: 1.5rem;
+    }
+
+    p {
+      font-size: 0.9rem;
+    }
+  }
 `;
 
 const FormCard = styled.div`
@@ -28,12 +52,25 @@ const FormCard = styled.div`
   padding: 40px;
   border: 1px solid rgba(0,0,0,0.05);
   max-width: 700px;
+
+  @media (max-width: 768px) {
+    padding: 30px;
+  }
+
+  @media (max-width: 480px) {
+    padding: 20px;
+    border-radius: 8px;
+  }
 `;
 
 const Form = styled.form`
   display: flex;
   flex-direction: column;
   gap: 25px;
+
+  @media (max-width: 480px) {
+    gap: 20px;
+  }
 `;
 
 const FormGroup = styled.div`
@@ -46,12 +83,36 @@ const FormGroup = styled.div`
     color: #2d3748;
     font-size: 16px;
   }
+
+  @media (max-width: 768px) {
+    label {
+      font-size: 15px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    gap: 8px;
+
+    label {
+      font-size: 14px;
+    }
+  }
 `;
 
 const ButtonGroup = styled.div`
   display: flex;
   gap: 12px;
   margin-top: 10px;
+  flex-wrap: wrap;
+
+  @media (max-width: 480px) {
+    gap: 10px;
+
+    button {
+      flex: 1;
+      min-width: 100px;
+    }
+  }
 `;
 
 const SubmitBtn = styled.button`
@@ -64,6 +125,16 @@ const SubmitBtn = styled.button`
   &:hover:not(:disabled) {
     transform: translateY(-2px);
     box-shadow: 0 8px 12px rgba(66, 153, 225, 0.35);
+  }
+
+  @media (max-width: 768px) {
+    padding: 12px 24px;
+    font-size: 15px;
+  }
+
+  @media (max-width: 480px) {
+    padding: 10px 16px;
+    font-size: 14px;
   }
 `;
 
@@ -78,6 +149,16 @@ const CancelBtn = styled.button`
   &:hover {
     background: #a0aec0;
     transform: translateY(-2px);
+  }
+
+  @media (max-width: 768px) {
+    padding: 12px 24px;
+    font-size: 15px;
+  }
+
+  @media (max-width: 480px) {
+    padding: 10px 16px;
+    font-size: 14px;
   }
 `;
 
