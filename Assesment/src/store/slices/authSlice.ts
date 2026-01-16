@@ -17,15 +17,15 @@ const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    setUser: (state: AuthState, action: PayloadAction<User | null>) => {
+    setUser: (state, action: PayloadAction<User | null>) => {
       state.user = action.payload;
       state.loading = false;
       state.error = null;
     },
-    setLoading: (state: AuthState, action: PayloadAction<boolean>) => {
+    setLoading: (state, action: PayloadAction<boolean>) => {
       state.loading = action.payload;
     },
-    setError: (state: AuthState, action: PayloadAction<string>) => {
+    setError: (state, action: PayloadAction<string>) => {
       state.error = action.payload;
       state.loading = false;
     },

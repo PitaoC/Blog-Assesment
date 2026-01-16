@@ -8,16 +8,114 @@ import { User } from '@supabase/supabase-js';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 
-const BlogItem = styled.div`
+const PageHeader = styled.div`
+  margin-bottom: 40px;
+
+  h1 {
+    color: #1a202c;
+    font-size: 2.5rem;
+    margin: 0 0 10px 0;
+  }
+
+  p {
+    color: #718096;
+    font-size: 1.1rem;
+    margin: 0;
+  }
+`;
+
+const BlogContainer = styled.div`
+  display: grid;
+  gap: 25px;
+  margin-bottom: 40px;
+`;
+
+const BlogItem = styled.article`
   background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  padding: 20px;
-  margin-bottom: 20px;
-  transition: box-shadow 0.3s;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+  padding: 30px;
+  border: 1px solid rgba(0,0,0,0.05);
+  transition: all 0.3s ease;
+  border-left: 4px solid #5a67d8;
 
   &:hover {
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+    transform: translateY(-4px);
+  }
+
+  h2 {
+    margin: 0 0 12px 0;
+    font-size: 1.5rem;
+    color: #1a202c;
+  }
+
+  p {
+    color: #4a5568;
+    line-height: 1.7;
+    margin: 0 0 20px 0;
+    font-size: 1rem;
+  }
+`;
+
+const BlogActions = styled.div`
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e2e8f0;
+
+  a {
+    display: inline-block;
+    padding: 8px 16px;
+    background: #5a67d8;
+    color: white;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+
+    &:hover {
+      background: #4c51bf;
+      text-decoration: none;
+    }
+  }
+`;
+
+const DeleteBtn = styled.button`
+  background: #f56565;
+  padding: 8px 16px;
+  font-size: 14px;
+  box-shadow: 0 2px 4px rgba(245, 101, 101, 0.2);
+
+  &:hover:not(:disabled) {
+    background: #e53e3e;
+    box-shadow: 0 4px 8px rgba(245, 101, 101, 0.3);
+  }
+`;
+
+const PaginationContainer = styled.div`
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  align-items: center;
+  margin-top: 40px;
+
+  button {
+    padding: 10px 20px;
+    min-width: 100px;
+  }
+`;
+
+const EmptyState = styled.div`
+  text-align: center;
+  padding: 60px 20px;
+  color: #718096;
+
+  p {
+    font-size: 1.1rem;
+    margin: 10px 0;
   }
 `;
 
@@ -53,21 +151,38 @@ const BlogList: React.FC = () => {
 
   return (
     <div className="container">
-      <h1>Blogs</h1>
-      {blogs.map((blog: Blog) => (
-        <BlogItem key={blog.id}>
-          <h2>{blog.title}</h2>
-          <p>{blog.content.substring(0, 100)}...</p>
-          {user && user.id === blog.author_id && (
-            <>
-              <Link to={`/blogs/${blog.id}/edit`}>Edit</Link>
-              <button onClick={() => handleDelete(blog.id)}>Delete</button>
-            </>
-          )}
-        </BlogItem>
-      ))}
-      <button onClick={() => setPage(page - 1)} disabled={page === 0}>Prev</button>
-      <button onClick={() => setPage(page + 1)}>Next</button>
+      <PageHeader>
+        <h1>Discover Stories</h1>
+        <p>Explore amazing blog posts from our community</p>
+      </PageHeader>
+      {blogs.length === 0 ? (
+        <EmptyState>
+          <p>No blogs found yet.</p>
+          <p>Be the first to share your story!</p>
+        </EmptyState>
+      ) : (
+        <>
+          <BlogContainer>
+            {blogs.map((blog: Blog) => (
+              <BlogItem key={blog.id}>
+                <h2>{blog.title}</h2>
+                <p>{blog.content.substring(0, 150)}...</p>
+                {user && user.id === blog.author_id && (
+                  <BlogActions>
+                    <Link to={`/blogs/${blog.id}/edit`}>Edit</Link>
+                    <DeleteBtn onClick={() => handleDelete(blog.id)}>Delete</DeleteBtn>
+                  </BlogActions>
+                )}
+              </BlogItem>
+            ))}
+          </BlogContainer>
+          <PaginationContainer>
+            <button onClick={() => setPage(page - 1)} disabled={page === 0}>← Previous</button>
+            <span style={{ color: '#718096', fontWeight: 600 }}>Page {page + 1}</span>
+            <button onClick={() => setPage(page + 1)}>Next →</button>
+          </PaginationContainer>
+        </>
+      )}
     </div>
   );
 };
