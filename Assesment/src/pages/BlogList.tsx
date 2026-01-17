@@ -268,7 +268,7 @@ const BlogList: React.FC = () => {
           <PaginationContainer>
             <button onClick={() => setPage(page - 1)} disabled={page === 0}>← Previous</button>
             <span style={{ color: '#718096', fontWeight: 600 }}>Page {page + 1}</span>
-            <button onClick={() => setPage(page + 1)}>Next →</button>
+            <button onClick={() => setPage(page + 1)} disabled={blogs.length < 10}>Next →</button>
           </PaginationContainer>
         </>
       )}
