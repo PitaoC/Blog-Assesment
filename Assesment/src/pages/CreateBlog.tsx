@@ -151,11 +151,62 @@ const SuccessAlert = styled.div`
   gap: 12px;
 `;
 
+const ImagePreviewContainer = styled.div`
+  margin-top: 15px;
+  text-align: center;
+
+  img {
+    max-width: 300px;
+    max-height: 300px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    object-fit: cover;
+  }
+`;
+
+const ImageUploadLabel = styled.label`
+  display: inline-block;
+  padding: 12px 20px;
+  background: #5a67d8;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  margin-bottom: 10px;
+
+  &:hover {
+    background: #4c51bf;
+  }
+
+  input[type='file'] {
+    display: none;
+  }
+
+  @media (max-width: 480px) {
+    width: 100%;
+    text-align: center;
+    display: block;
+    padding: 12px 16px;
+  }
+`;
+
+const ImageFileName = styled.div`
+  color: #4a5568;
+  font-size: 14px;
+  margin-top: 8px;
+  font-weight: 500;
+`;
+
 const CreateBlog: React.FC = () => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [image, setImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [uploading, setUploading] = useState(false);
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
@@ -180,18 +231,58 @@ const CreateBlog: React.FC = () => {
       return;
     }
 
-    const { data, error: dbError } = await supabase
-      .from('blogs')
-      .insert({ title, content, author_id: user.id })
-      .select()
-      .single();
+    setUploading(true);
+    let imageUrl = '';
 
-    if (dbError) {
-      setError(`❌ Error publishing blog: ${dbError.message}`);
-    } else if (data) {
-      dispatch(addBlog(data));
-      setSuccess('✓ Blog published successfully! Redirecting...');
-      setTimeout(() => navigate('/blogs'), 1500);
+    try {
+      // Upload image if provided
+      if (image) {
+        const fileExt = image.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('blog-images')
+          .upload(`${fileName}`, image);
+
+        if (uploadError) {
+          setError(`❌ Error uploading image: ${uploadError.message}`);
+          setUploading(false);
+          return;
+        }
+
+        // Get public URL
+        const { data: publicData } = supabase.storage
+          .from('blog-images')
+          .getPublicUrl(`${fileName}`);
+
+        imageUrl = publicData.publicUrl;
+      }
+
+      // Insert blog with image URL (always include it, even if null)
+      const { data, error: dbError } = await supabase
+        .from('blogs')
+        .insert({
+          title: title.trim(),
+          content: content.trim(),
+          author_id: user.id,
+          image_url: imageUrl || null
+        })
+        .select()
+        .single();
+
+      if (dbError) {
+        setError(`❌ Error publishing blog: ${dbError.message}`);
+        console.error('Database error:', dbError);
+      } else if (data) {
+        dispatch(addBlog(data));
+        setSuccess('✓ Blog published successfully! Redirecting...');
+        setTimeout(() => navigate('/blogs'), 1500);
+      }
+    } catch (err) {
+      setError(`❌ An error occurred: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      console.error('Upload error:', err);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -216,6 +307,33 @@ const CreateBlog: React.FC = () => {
             />
           </FormGroup>
           <FormGroup>
+            <label>Blog Image (Optional)</label>
+            <ImageUploadLabel>
+              📸 Choose Image
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    setImage(file);
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                      setImagePreview(event.target?.result as string);
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                }}
+              />
+            </ImageUploadLabel>
+            {image && <ImageFileName>Selected: {image.name}</ImageFileName>}
+            {imagePreview && (
+              <ImagePreviewContainer>
+                <img src={imagePreview} alt="Preview" />
+              </ImagePreviewContainer>
+            )}
+          </FormGroup>
+          <FormGroup>
             <label htmlFor="content">Content</label>
             <textarea
               id="content"
@@ -227,7 +345,9 @@ const CreateBlog: React.FC = () => {
               style={{ resize: 'vertical', minHeight: '400px' }}
             />
           </FormGroup>
-          <SubmitBtn type="submit">Publish Blog</SubmitBtn>
+          <SubmitBtn type="submit" disabled={uploading}>
+            {uploading ? 'Publishing...' : 'Publish Blog'}
+          </SubmitBtn>
         </Form>
       </FormCard>
     </div>

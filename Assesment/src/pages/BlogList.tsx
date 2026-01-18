@@ -68,6 +68,16 @@ const BlogItem = styled.article`
     transform: translateY(-4px);
   }
 
+  img {
+    width: 100%;
+    height: auto;
+    max-height: 400px;
+    object-fit: contain;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    background: #f7fafc;
+  }
+
   h2 {
     margin: 0 0 12px 0;
     font-size: 1.5rem;
@@ -84,6 +94,11 @@ const BlogItem = styled.article`
   @media (max-width: 768px) {
     padding: 24px;
 
+    img {
+      max-height: 300px;
+      margin-bottom: 16px;
+    }
+
     h2 {
       font-size: 1.25rem;
     }
@@ -96,6 +111,11 @@ const BlogItem = styled.article`
   @media (max-width: 480px) {
     padding: 16px;
     border-radius: 8px;
+
+    img {
+      max-height: 200px;
+      margin-bottom: 12px;
+    }
 
     h2 {
       font-size: 1.1rem;
@@ -256,6 +276,7 @@ const BlogList: React.FC = () => {
               <BlogItem key={blog.id}>
                 <h2>{blog.title}</h2>
                 <p>{blog.content.substring(0, 150)}...</p>
+                {blog.image_url && <img src={blog.image_url} alt={blog.title} />}
                 {user && user.id === blog.author_id && (
                   <BlogActions>
                     <Link to={`/blogs/${blog.id}/edit`}>Edit</Link>
