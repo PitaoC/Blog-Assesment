@@ -62,6 +62,7 @@ const BlogItem = styled.article`
   border: 1px solid rgba(0,0,0,0.05);
   transition: all 0.3s ease;
   border-left: 4px solid #5a67d8;
+  cursor: pointer;
 
   &:hover {
     box-shadow: 0 8px 25px rgba(0,0,0,0.12);
@@ -163,6 +164,18 @@ const BlogActions = styled.div`
       padding: 6px 12px;
       font-size: 12px;
     }
+  }
+`;
+
+const BlogItemContent = styled.div`
+  cursor: pointer;
+
+  &:hover h2 {
+    color: #5a67d8;
+  }
+
+  h2, p {
+    transition: color 0.3s ease;
   }
 `;
 
@@ -274,9 +287,13 @@ const BlogList: React.FC = () => {
           <BlogContainer>
             {blogs.map((blog: Blog) => (
               <BlogItem key={blog.id}>
-                <h2>{blog.title}</h2>
-                <p>{blog.content.substring(0, 150)}...</p>
-                {blog.image_url && <img src={blog.image_url} alt={blog.title} />}
+                <Link to={`/blogs/${blog.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                  <BlogItemContent>
+                    <h2>{blog.title}</h2>
+                    <p>{blog.content.substring(0, 150)}...</p>
+                    {blog.image_url && <img src={blog.image_url} alt={blog.title} />}
+                  </BlogItemContent>
+                </Link>
                 {user && user.id === blog.author_id && (
                   <BlogActions>
                     <Link to={`/blogs/${blog.id}/edit`}>Edit</Link>

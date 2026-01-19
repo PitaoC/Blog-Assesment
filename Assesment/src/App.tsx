@@ -8,6 +8,7 @@ import Logout from './pages/Logout';
 import BlogList from './pages/BlogList';
 import CreateBlog from './pages/CreateBlog';
 import EditBlog from './pages/EditBlog';
+import ViewBlog from './pages/ViewBlog';
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
             <Route path="/logout" element={<Logout />} />
             <Route path="/blogs" element={<BlogList />} />
             <Route path="/blogs/create" element={<CreateBlog />} />
+            <Route path="/blogs/:id" element={<ViewBlog />} />
             <Route path="/blogs/:id/edit" element={<EditBlog />} />
             <Route path="/" element={<BlogList />} />
           </Routes>
