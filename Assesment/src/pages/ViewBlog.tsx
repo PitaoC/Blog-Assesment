@@ -6,6 +6,8 @@ import { Blog } from '../store/slices/blogsSlice';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { User } from '@supabase/supabase-js';
+import Comment, { CommentData } from '../components/Comment';
+import AddComment from '../components/AddComment';
 
 const PageContainer = styled.div`
   max-width: 900px;
@@ -193,12 +195,40 @@ const ErrorMessage = styled.div`
   margin-bottom: 20px;
 `;
 
+const CommentsSection = styled.div`
+  margin-top: 50px;
+  padding-top: 40px;
+  border-top: 2px solid #e2e8f0;
+`;
+
+const CommentsSectionTitle = styled.h2`
+  color: #1a202c;
+  font-size: 1.5rem;
+  margin: 0 0 30px 0;
+  font-weight: 600;
+`;
+
+const CommentsList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+`;
+
+const NoCommentsMessage = styled.p`
+  color: #718096;
+  text-align: center;
+  padding: 30px;
+  font-style: italic;
+`;
+
 const ViewBlog: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [blog, setBlog] = useState<Blog | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [comments, setComments] = useState<CommentData[]>([]);
+  const [loadingComments, setLoadingComments] = useState(false);
   const user = useSelector((state: RootState) => state.auth.user as User | null);
 
   useEffect(() => {
@@ -232,6 +262,23 @@ const ViewBlog: React.FC = () => {
 
     fetchBlog();
   }, [id]);
+
+  const loadComments = async () => {
+    if (!id) return;
+    setLoadingComments(true);
+    setComments([]);
+    setLoadingComments(false);
+  };
+
+  useEffect(() => {
+    if (id) {
+      loadComments();
+    }
+  }, [id]);
+
+  const handleAddComment = (comment: { author: string; content: string; image_url?: string }) => {
+    console.log('Comment added:', comment);
+  };
 
   const handleDelete = async () => {
     if (!blog) return;
@@ -303,6 +350,25 @@ const ViewBlog: React.FC = () => {
             </>
           )}
         </BlogActions>
+
+        <CommentsSection>
+          <CommentsSectionTitle>Comments ({comments.length})</CommentsSectionTitle>
+          <AddComment
+            blogId={blog.id}
+            userName={user?.email || 'Anonymous User'}
+            onCommentAdd={handleAddComment}
+            isLoading={loadingComments}
+          />
+          {comments.length === 0 ? (
+            <NoCommentsMessage>No comments yet. Be the first to share your thoughts!</NoCommentsMessage>
+          ) : (
+            <CommentsList>
+              {comments.map((comment) => (
+                <Comment key={comment.id} comment={comment} />
+              ))}
+            </CommentsList>
+          )}
+        </CommentsSection>
       </BlogContent>
     </PageContainer>
   );

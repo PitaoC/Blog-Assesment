@@ -7,6 +7,8 @@ import { Blog } from '../store/slices/blogsSlice';
 import { User } from '@supabase/supabase-js';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
+import Comment, { CommentData } from '../components/Comment';
+import AddComment from '../components/AddComment';
 
 const PageHeader = styled.div`
   margin-bottom: 40px;
@@ -241,11 +243,48 @@ const EmptyState = styled.div`
   }
 `;
 
+const CommentsSection = styled.div`
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 2px solid #e2e8f0;
+`;
+
+const CommentsSectionTitle = styled.h3`
+  color: #2d3748;
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 16px 0;
+`;
+
+const CommentsList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+`;
+
+const ViewCommentsLink = styled(Link)`
+  display: inline-block;
+  color: #5a67d8;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  margin-top: 12px;
+  transition: all 0.3s ease;
+
+  &:hover {
+    color: #4c51bf;
+    text-decoration: underline;
+  }
+`;
+
 const BlogList: React.FC = () => {
   const dispatch = useDispatch();
   const blogs = useSelector((state: RootState) => state.blogs.list);
   const user = useSelector((state: RootState) => state.auth.user as User | null);
   const [page, setPage] = useState(0);
+  const comments: { [blogId: string]: CommentData[] } = {};
+  const loadingComments: { [blogId: string]: boolean } = {};
 
   useEffect(() => {
     const fetchBlogs = async () => {
@@ -269,6 +308,10 @@ const BlogList: React.FC = () => {
     if (!error) {
       dispatch(removeBlog(id));
     }
+  };
+
+  const handleAddComment = (blogId: string, comment: { author: string; content: string; image_url?: string }) => {
+    console.log('Comment added to blog:', blogId, comment);
   };
 
   return (
@@ -300,6 +343,25 @@ const BlogList: React.FC = () => {
                     <DeleteBtn onClick={() => handleDelete(blog.id)}>Delete</DeleteBtn>
                   </BlogActions>
                 )}
+                <CommentsSection>
+                  <CommentsSectionTitle>Comments</CommentsSectionTitle>
+                  <AddComment
+                    blogId={blog.id}
+                    userName={user?.email || 'Anonymous User'}
+                    onCommentAdd={(comment) => handleAddComment(blog.id, comment)}
+                    isLoading={loadingComments[blog.id] || false}
+                  />
+                  <CommentsList>
+                    {(comments[blog.id] || []).slice(0, 3).map((comment) => (
+                      <Comment key={comment.id} comment={comment} />
+                    ))}
+                  </CommentsList>
+                  {(comments[blog.id]?.length || 0) > 3 && (
+                    <ViewCommentsLink to={`/blogs/${blog.id}`}>
+                      View all {comments[blog.id]?.length} comments →
+                    </ViewCommentsLink>
+                  )}
+                </CommentsSection>
               </BlogItem>
             ))}
           </BlogContainer>
