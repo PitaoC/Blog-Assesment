@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
 
 export interface CommentData {
@@ -30,6 +30,13 @@ const AvatarPlaceholder = styled.div`
   color: white;
   font-weight: 600;
   font-size: 16px;
+  position: relative;
+  overflow: hidden;
+
+  svg {
+    width: 24px;
+    height: 24px;
+  }
 `;
 
 const CommentContent = styled.div`
@@ -76,12 +83,45 @@ const CommentImage = styled.img`
   margin-top: 10px;
 `;
 
+const CommentActions = styled.div`
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+
+  button {
+    background: none;
+    border: none;
+    color: #718096;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+
+    &:hover {
+      color: #5a67d8;
+    }
+
+    &.delete-btn:hover {
+      color: #f56565;
+    }
+  }
+`;
+
 interface CommentProps {
   comment: CommentData;
+  currentUserId?: string;
+  onDelete?: (commentId: string) => Promise<void>;
+  onEdit?: (commentId: string, content: string) => Promise<void>;
 }
 
-const Comment: React.FC<CommentProps> = ({ comment }) => {
-  const getInitials = (name: string) => {
+const Comment: React.FC<CommentProps> = ({ comment, currentUserId, onDelete, onEdit }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContent, setEditedContent] = useState(comment.content);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const getInitials = (name?: string) => {
+    if (!name) return 'AN';
     return name
       .split(' ')
       .map((n) => n[0])
@@ -111,16 +151,98 @@ const Comment: React.FC<CommentProps> = ({ comment }) => {
     });
   };
 
+  const handleDelete = async () => {
+    if (isDeleting || !onDelete) return;
+    if (window.confirm('Are you sure you want to delete this comment?')) {
+      setIsDeleting(true);
+      try {
+        await onDelete(comment.id);
+      } finally {
+        setIsDeleting(false);
+      }
+    }
+  };
+
+  const handleEditSave = async () => {
+    if (isSaving || !onEdit || !editedContent.trim()) return;
+    setIsSaving(true);
+    try {
+      await onEdit(comment.id, editedContent.trim());
+      setIsEditing(false);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleEditCancel = () => {
+    setEditedContent(comment.content);
+    setIsEditing(false);
+  };
+
   return (
     <CommentWrapper>
-      <AvatarPlaceholder>{getInitials(comment.author)}</AvatarPlaceholder>
+      <AvatarPlaceholder>
+        {comment.author && comment.author !== 'Anonymous' ? (
+          getInitials(comment.author)
+        ) : (
+          <svg
+            viewBox="0 0 24 24"
+            fill="white"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z" />
+          </svg>
+        )}
+      </AvatarPlaceholder>
       <CommentContent>
         <CommentHeader>
-          <span className="author-name">{comment.author}</span>
+          <span className="author-name">{comment.author || 'Anonymous'}</span>
           <span className="comment-date">{formatDate(comment.created_at)}</span>
         </CommentHeader>
-        <CommentText>{comment.content}</CommentText>
-        {comment.image_url && <CommentImage src={comment.image_url} alt="Comment attachment" />}
+        {isEditing ? (
+          <>
+            <textarea
+              style={{
+                width: '100%',
+                minHeight: '60px',
+                padding: '8px',
+                borderRadius: '4px',
+                border: '1px solid #e2e8f0',
+                fontFamily: 'inherit',
+                fontSize: '14px',
+              }}
+              value={editedContent}
+              onChange={(e) => setEditedContent(e.target.value)}
+              disabled={isSaving}
+            />
+            <CommentActions>
+              <button
+                onClick={handleEditSave}
+                disabled={isSaving || !editedContent.trim()}
+              >
+                {isSaving ? 'Saving...' : 'Save'}
+              </button>
+              <button onClick={handleEditCancel} disabled={isSaving}>
+                Cancel
+              </button>
+            </CommentActions>
+          </>
+        ) : (
+          <>
+            <CommentText>{comment.content}</CommentText>
+            {comment.image_url && (
+              <CommentImage src={comment.image_url} alt="Comment attachment" />
+            )}
+            {currentUserId && (
+              <CommentActions>
+                <button onClick={() => setIsEditing(true)}>Edit</button>
+                <button className="delete-btn" onClick={handleDelete} disabled={isDeleting}>
+                  {isDeleting ? 'Deleting...' : 'Delete'}
+                </button>
+              </CommentActions>
+            )}
+          </>
+        )}
       </CommentContent>
     </CommentWrapper>
   );

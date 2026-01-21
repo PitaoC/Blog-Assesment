@@ -14,6 +14,29 @@ const PageContainer = styled.div`
   margin: 0 auto;
 `;
 
+const BackButton = styled.button`
+  background: #e2e8f0;
+  color: #2d3748;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  margin-bottom: 20px;
+
+  &:hover {
+    background: #cbd5e0;
+  }
+
+  @media (max-width: 480px) {
+    padding: 8px 16px;
+    font-size: 12px;
+    margin-bottom: 16px;
+  }
+`;
+
 const BlogContent = styled.article`
   background: white;
   border-radius: 12px;
@@ -124,7 +147,7 @@ const BlogActions = styled.div`
   border-top: 1px solid #e2e8f0;
   flex-wrap: wrap;
 
-  button, a {
+  button {
     display: inline-block;
     padding: 10px 20px;
     border-radius: 6px;
@@ -134,15 +157,6 @@ const BlogActions = styled.div`
     transition: all 0.3s ease;
     border: none;
     cursor: pointer;
-  }
-
-  .back-btn {
-    background: #e2e8f0;
-    color: #2d3748;
-
-    &:hover {
-      background: #cbd5e0;
-    }
   }
 
   .edit-btn {
@@ -168,7 +182,7 @@ const BlogActions = styled.div`
     margin-top: 24px;
     padding-top: 20px;
 
-    button, a {
+    button {
       padding: 8px 16px;
       font-size: 12px;
     }
@@ -266,18 +280,53 @@ const ViewBlog: React.FC = () => {
   const loadComments = async () => {
     if (!id) return;
     setLoadingComments(true);
-    setComments([]);
-    setLoadingComments(false);
+    try {
+      const { data, error } = await supabase
+        .from('comments')
+        .select('*')
+        .eq('blog_id', id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setComments(data || []);
+    } catch (error) {
+      console.error('Error loading comments:', error);
+    } finally {
+      setLoadingComments(false);
+    }
   };
 
   useEffect(() => {
     if (id) {
       loadComments();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const handleAddComment = (comment: { author: string; content: string; image_url?: string }) => {
-    console.log('Comment added:', comment);
+  const handleDeleteComment = async (commentId: string) => {
+    try {
+      const { error } = await supabase.from('comments').delete().eq('id', commentId);
+      if (error) throw error;
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      alert('Failed to delete comment');
+    }
+  };
+
+  const handleEditComment = async (commentId: string, content: string) => {
+    try {
+      const { error } = await supabase
+        .from('comments')
+        .update({ content })
+        .eq('id', commentId);
+
+      if (error) throw error;
+      setComments((prev) => prev.map((c) => (c.id === commentId ? { ...c, content } : c)));
+    } catch (error) {
+      console.error('Error updating comment:', error);
+      alert('Failed to update comment');
+    }
   };
 
   const handleDelete = async () => {
@@ -295,22 +344,25 @@ const ViewBlog: React.FC = () => {
 
   if (loading) {
     return (
-      <PageContainer className="container">
-        <LoadingSpinner>
-          <p>Loading blog...</p>
-        </LoadingSpinner>
-      </PageContainer>
+      <div className="container">
+        <BackButton onClick={() => navigate('/blogs')}>← Back to Blogs</BackButton>
+        <PageContainer>
+          <LoadingSpinner>
+            <p>Loading blog...</p>
+          </LoadingSpinner>
+        </PageContainer>
+      </div>
     );
   }
 
   if (error || !blog) {
     return (
-      <PageContainer className="container">
-        <ErrorMessage>{error || 'Blog not found'}</ErrorMessage>
-        <button className="back-btn" onClick={() => navigate('/blogs')}>
-          ← Back to Blogs
-        </button>
-      </PageContainer>
+      <div className="container">
+        <BackButton onClick={() => navigate('/blogs')}>← Back to Blogs</BackButton>
+        <PageContainer>
+          <ErrorMessage>{error || 'Blog not found'}</ErrorMessage>
+        </PageContainer>
+      </div>
     );
   }
 
@@ -321,56 +373,63 @@ const ViewBlog: React.FC = () => {
   });
 
   return (
-    <PageContainer className="container">
-      <BlogContent>
-        <h1>{blog.title}</h1>
-        <div className="blog-meta">
-          <span>By Author</span>
-          <span>{createdDate}</span>
-        </div>
-        {blog.image_url && <img src={blog.image_url} alt={blog.title} />}
-        <div className="blog-body">
-          <p>{blog.content}</p>
-        </div>
-        <BlogActions>
-          <button className="back-btn" onClick={() => navigate('/blogs')}>
-            ← Back to Blogs
-          </button>
-          {user && user.id === blog.author_id && (
-            <>
-              <button
-                className="edit-btn"
-                onClick={() => navigate(`/blogs/${blog.id}/edit`)}
-              >
-                Edit
-              </button>
-              <button className="delete-btn" onClick={handleDelete}>
-                Delete
-              </button>
-            </>
-          )}
-        </BlogActions>
+    <div className="container">
+      <BackButton onClick={() => navigate('/blogs')}>← Back to Blogs</BackButton>
+      <PageContainer>
+        <BlogContent>
+          <h1>{blog.title}</h1>
+          <div className="blog-meta">
+            <span>By Author</span>
+            <span>{createdDate}</span>
+          </div>
+          {blog.image_url && <img src={blog.image_url} alt={blog.title} />}
+          <div className="blog-body">
+            <p>{blog.content}</p>
+          </div>
+          <BlogActions>
+            {user && user.id === blog.author_id && (
+              <>
+                <button
+                  className="edit-btn"
+                  onClick={() => navigate(`/blogs/${blog.id}/edit`)}
+                >
+                  Edit
+                </button>
+                <button className="delete-btn" onClick={handleDelete}>
+                  Delete
+                </button>
+              </>
+            )}
+          </BlogActions>
 
-        <CommentsSection>
-          <CommentsSectionTitle>Comments ({comments.length})</CommentsSectionTitle>
-          <AddComment
-            blogId={blog.id}
-            userName={user?.email || 'Anonymous User'}
-            onCommentAdd={handleAddComment}
-            isLoading={loadingComments}
-          />
-          {comments.length === 0 ? (
-            <NoCommentsMessage>No comments yet. Be the first to share your thoughts!</NoCommentsMessage>
-          ) : (
-            <CommentsList>
-              {comments.map((comment) => (
-                <Comment key={comment.id} comment={comment} />
-              ))}
-            </CommentsList>
-          )}
-        </CommentsSection>
-      </BlogContent>
-    </PageContainer>
+          <CommentsSection>
+            <CommentsSectionTitle>Comments ({comments.length})</CommentsSectionTitle>
+            <AddComment
+              blogId={blog.id}
+              userName={user?.email || 'Anonymous User'}
+              userId={user?.id}
+              onCommentAdd={() => loadComments()}
+              isLoading={loadingComments}
+            />
+            {comments.length === 0 ? (
+              <NoCommentsMessage>No comments yet. Be the first to share your thoughts!</NoCommentsMessage>
+            ) : (
+              <CommentsList>
+                {comments.map((comment) => (
+                  <Comment
+                    key={comment.id}
+                    comment={comment}
+                    currentUserId={user?.id}
+                    onDelete={handleDeleteComment}
+                    onEdit={(commentId, content) => handleEditComment(commentId, content)}
+                  />
+                ))}
+              </CommentsList>
+            )}
+          </CommentsSection>
+        </BlogContent>
+      </PageContainer>
+    </div>
   );
 };
 

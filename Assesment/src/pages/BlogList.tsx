@@ -263,28 +263,13 @@ const CommentsList = styled.div`
   margin-top: 12px;
 `;
 
-const ViewCommentsLink = styled(Link)`
-  display: inline-block;
-  color: #5a67d8;
-  text-decoration: none;
-  font-size: 14px;
-  font-weight: 600;
-  margin-top: 12px;
-  transition: all 0.3s ease;
-
-  &:hover {
-    color: #4c51bf;
-    text-decoration: underline;
-  }
-`;
-
 const BlogList: React.FC = () => {
   const dispatch = useDispatch();
   const blogs = useSelector((state: RootState) => state.blogs.list);
   const user = useSelector((state: RootState) => state.auth.user as User | null);
   const [page, setPage] = useState(0);
-  const comments: { [blogId: string]: CommentData[] } = {};
-  const loadingComments: { [blogId: string]: boolean } = {};
+  const [comments, setComments] = useState<{ [blogId: string]: CommentData[] }>({});
+  const [loadingComments, setLoadingComments] = useState<{ [blogId: string]: boolean }>({});
 
   useEffect(() => {
     const fetchBlogs = async () => {
@@ -303,6 +288,32 @@ const BlogList: React.FC = () => {
     fetchBlogs();
   }, [page, dispatch]);
 
+  const loadCommentsForBlog = async (blogId: string) => {
+    if (comments[blogId]) return;
+
+    setLoadingComments((prev) => ({ ...prev, [blogId]: true }));
+    try {
+      const { data, error } = await supabase
+        .from('comments')
+        .select('*')
+        .eq('blog_id', blogId)
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+      if (error) throw error;
+      setComments((prev) => ({ ...prev, [blogId]: data || [] }));
+    } catch (error) {
+      console.error('Error loading comments:', error);
+    } finally {
+      setLoadingComments((prev) => ({ ...prev, [blogId]: false }));
+    }
+  };
+
+  useEffect(() => {
+    blogs.forEach((blog) => loadCommentsForBlog(blog.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blogs]);
+
   const handleDelete = async (id: string) => {
     const { error } = await supabase.from('blogs').delete().eq('id', id);
     if (!error) {
@@ -310,8 +321,41 @@ const BlogList: React.FC = () => {
     }
   };
 
-  const handleAddComment = (blogId: string, comment: { author: string; content: string; image_url?: string }) => {
-    console.log('Comment added to blog:', blogId, comment);
+  const handleDeleteComment = async (blogId: string, commentId: string) => {
+    try {
+      const { error } = await supabase.from('comments').delete().eq('id', commentId);
+      if (error) throw error;
+      setComments((prev) => ({
+        ...prev,
+        [blogId]: prev[blogId].filter((c) => c.id !== commentId),
+      }));
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      alert('Failed to delete comment');
+    }
+  };
+
+  const handleEditComment = async (blogId: string, commentId: string, content: string) => {
+    try {
+      const { error } = await supabase
+        .from('comments')
+        .update({ content })
+        .eq('id', commentId);
+
+      if (error) throw error;
+      setComments((prev) => ({
+        ...prev,
+        [blogId]: prev[blogId].map((c) => (c.id === commentId ? { ...c, content } : c)),
+      }));
+    } catch (error) {
+      console.error('Error updating comment:', error);
+      alert('Failed to update comment');
+    }
+  };
+
+  const handleCommentAdded = (blogId: string) => {
+    setComments((prev) => ({ ...prev, [blogId]: [] }));
+    loadCommentsForBlog(blogId);
   };
 
   return (
@@ -348,19 +392,21 @@ const BlogList: React.FC = () => {
                   <AddComment
                     blogId={blog.id}
                     userName={user?.email || 'Anonymous User'}
-                    onCommentAdd={(comment) => handleAddComment(blog.id, comment)}
+                    userId={user?.id}
+                    onCommentAdd={() => handleCommentAdded(blog.id)}
                     isLoading={loadingComments[blog.id] || false}
                   />
                   <CommentsList>
-                    {(comments[blog.id] || []).slice(0, 3).map((comment) => (
-                      <Comment key={comment.id} comment={comment} />
+                    {(comments[blog.id] || []).map((comment) => (
+                      <Comment
+                        key={comment.id}
+                        comment={comment}
+                        currentUserId={user?.id}
+                        onDelete={(commentId) => handleDeleteComment(blog.id, commentId)}
+                        onEdit={(commentId, content) => handleEditComment(blog.id, commentId, content)}
+                      />
                     ))}
                   </CommentsList>
-                  {(comments[blog.id]?.length || 0) > 3 && (
-                    <ViewCommentsLink to={`/blogs/${blog.id}`}>
-                      View all {comments[blog.id]?.length} comments →
-                    </ViewCommentsLink>
-                  )}
                 </CommentsSection>
               </BlogItem>
             ))}

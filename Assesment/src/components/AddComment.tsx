@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import styled from 'styled-components';
+import { supabase } from '../utils/supabase';
 
 const AddCommentWrapper = styled.div`
   background: white;
@@ -27,6 +28,11 @@ const AvatarPlaceholder = styled.div`
   color: white;
   font-weight: 600;
   font-size: 16px;
+
+  svg {
+    width: 24px;
+    height: 24px;
+  }
 `;
 
 const InputContainer = styled.div`
@@ -234,28 +240,34 @@ const EmojiOption = styled.button`
 `;
 
 interface AddCommentProps {
-  blogId?: string;
+  blogId: string;
   userName?: string;
-  onCommentAdd?: (comment: { author: string; content: string; image_url?: string }) => void;
+  userId?: string;
+  onCommentAdd?: () => void;
   isLoading?: boolean;
 }
 
 const EMOJIS = ['😀', '😂', '❤️', '😍', '🎉', '👍', '🔥', '💯', '✨', '🙌', '😢', '🤔'];
 
 const AddComment: React.FC<AddCommentProps> = ({
+  blogId,
   userName = 'Anonymous User',
+  userId,
   onCommentAdd,
   isLoading = false,
 }) => {
   const [commentText, setCommentText] = useState('');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setImageFile(file);
       const reader = new FileReader();
       reader.onload = (event) => {
         setImagePreview(event.target?.result as string);
@@ -264,8 +276,29 @@ const AddComment: React.FC<AddCommentProps> = ({
     }
   };
 
+  const uploadCommentImage = async (file: File): Promise<string | null> => {
+    try {
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      const { data, error } = await supabase.storage
+        .from('comment-images')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data: publicUrlData } = supabase.storage
+        .from('comment-images')
+        .getPublicUrl(data.path);
+
+      return publicUrlData.publicUrl;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      return null;
+    }
+  };
+
   const handleRemoveImage = () => {
     setImagePreview(null);
+    setImageFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -276,24 +309,49 @@ const AddComment: React.FC<AddCommentProps> = ({
     setShowEmojiPicker(false);
   };
 
-  const handleSubmit = () => {
-    if (commentText.trim()) {
-      onCommentAdd?.({
-        author: userName,
-        content: commentText,
-        image_url: imagePreview || undefined,
-      });
+  const handleSubmit = async () => {
+    if (!commentText.trim() || isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      let imageUrl: string | null = null;
+
+      if (imageFile) {
+        imageUrl = await uploadCommentImage(imageFile);
+      }
+
+      const { error } = await supabase.from('comments').insert([
+        {
+          blog_id: blogId,
+          author_id: userId || null,
+          author_name: userName,
+          content: commentText.trim(),
+          image_url: imageUrl,
+        },
+      ]);
+
+      if (error) throw error;
+
       setCommentText('');
       setImagePreview(null);
+      setImageFile(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+
+      onCommentAdd?.();
+    } catch (error) {
+      console.error('Error posting comment:', error);
+      alert('Failed to post comment. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleCancel = () => {
     setCommentText('');
     setImagePreview(null);
+    setImageFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -311,7 +369,19 @@ const AddComment: React.FC<AddCommentProps> = ({
   return (
     <AddCommentWrapper>
       <CommentInputSection>
-        <AvatarPlaceholder>{getInitials(userName)}</AvatarPlaceholder>
+        <AvatarPlaceholder>
+          {userName && userName !== 'Anonymous User' ? (
+            getInitials(userName)
+          ) : (
+            <svg
+              viewBox="0 0 24 24"
+              fill="white"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z" />
+            </svg>
+          )}
+        </AvatarPlaceholder>
         <InputContainer>
           <CommentInput
             placeholder="Share your thoughts..."
@@ -373,9 +443,9 @@ const AddComment: React.FC<AddCommentProps> = ({
         </CancelBtn>
         <SubmitBtn
           onClick={handleSubmit}
-          disabled={!commentText.trim() || isLoading}
+          disabled={!commentText.trim() || isSubmitting}
         >
-          {isLoading ? 'Posting...' : 'Post Comment'}
+          {isSubmitting ? 'Posting...' : 'Post Comment'}
         </SubmitBtn>
       </ButtonGroup>
     </AddCommentWrapper>
