@@ -288,8 +288,9 @@ const BlogList: React.FC = () => {
     fetchBlogs();
   }, [page, dispatch]);
 
-  const loadCommentsForBlog = async (blogId: string) => {
-    if (comments[blogId]) return;
+  const loadCommentsForBlog = async (blogId: string, forceReload = false) => {
+    // Skip cache when explicitly refreshing (e.g., right after a new comment is added)
+    if (!forceReload && comments[blogId]) return;
 
     setLoadingComments((prev) => ({ ...prev, [blogId]: true }));
     try {
@@ -354,8 +355,7 @@ const BlogList: React.FC = () => {
   };
 
   const handleCommentAdded = (blogId: string) => {
-    setComments((prev) => ({ ...prev, [blogId]: [] }));
-    loadCommentsForBlog(blogId);
+    loadCommentsForBlog(blogId, true);
   };
 
   return (
