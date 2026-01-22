@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 import Comment, { CommentData } from '../components/Comment';
 import AddComment from '../components/AddComment';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 const PageHeader = styled.div`
   margin-bottom: 40px;
@@ -270,6 +271,9 @@ const BlogList: React.FC = () => {
   const [page, setPage] = useState(0);
   const [comments, setComments] = useState<{ [blogId: string]: CommentData[] }>({});
   const [loadingComments, setLoadingComments] = useState<{ [blogId: string]: boolean }>({});
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingBlogId, setDeletingBlogId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     const fetchBlogs = async () => {
@@ -315,10 +319,20 @@ const BlogList: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blogs]);
 
-  const handleDelete = async (id: string) => {
-    const { error } = await supabase.from('blogs').delete().eq('id', id);
-    if (!error) {
-      dispatch(removeBlog(id));
+  const handleDelete = async () => {
+    if (!deletingBlogId) return;
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase.from('blogs').delete().eq('id', deletingBlogId);
+      if (!error) {
+        dispatch(removeBlog(deletingBlogId));
+      }
+    } catch (error) {
+      console.error('Error deleting blog:', error);
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+      setDeletingBlogId(null);
     }
   };
 
@@ -384,7 +398,14 @@ const BlogList: React.FC = () => {
                 {user && user.id === blog.author_id && (
                   <BlogActions>
                     <Link to={`/blogs/${blog.id}/edit`}>Edit</Link>
-                    <DeleteBtn onClick={() => handleDelete(blog.id)}>Delete</DeleteBtn>
+                    <DeleteBtn
+                      onClick={() => {
+                        setDeletingBlogId(blog.id);
+                        setShowDeleteConfirm(true);
+                      }}
+                    >
+                      Delete
+                    </DeleteBtn>
                   </BlogActions>
                 )}
                 <CommentsSection>
@@ -418,6 +439,18 @@ const BlogList: React.FC = () => {
           </PaginationContainer>
         </>
       )}
+
+      <ConfirmDialog
+        title="Delete Blog"
+        message="Are you sure you want to delete this blog? This action cannot be undone."
+        isOpen={showDeleteConfirm}
+        onConfirm={handleDelete}
+        onCancel={() => {
+          setShowDeleteConfirm(false);
+          setDeletingBlogId(null);
+        }}
+        isLoading={isDeleting}
+      />
     </div>
   );
 };

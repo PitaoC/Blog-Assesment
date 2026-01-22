@@ -8,6 +8,7 @@ import { RootState } from '../store';
 import { User } from '@supabase/supabase-js';
 import Comment, { CommentData } from '../components/Comment';
 import AddComment from '../components/AddComment';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 const PageContainer = styled.div`
   max-width: 900px;
@@ -243,6 +244,8 @@ const ViewBlog: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [comments, setComments] = useState<CommentData[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const user = useSelector((state: RootState) => state.auth.user as User | null);
 
   useEffect(() => {
@@ -331,14 +334,18 @@ const ViewBlog: React.FC = () => {
 
   const handleDelete = async () => {
     if (!blog) return;
-
-    if (window.confirm('Are you sure you want to delete this blog?')) {
+    setIsDeleting(true);
+    try {
       const { error } = await supabase.from('blogs').delete().eq('id', blog.id);
       if (!error) {
         navigate('/blogs');
       } else {
         setError('Failed to delete blog');
+        setShowDeleteConfirm(false);
       }
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -395,7 +402,7 @@ const ViewBlog: React.FC = () => {
                 >
                   Edit
                 </button>
-                <button className="delete-btn" onClick={handleDelete}>
+                <button className="delete-btn" onClick={() => setShowDeleteConfirm(true)}>
                   Delete
                 </button>
               </>
@@ -429,6 +436,15 @@ const ViewBlog: React.FC = () => {
           </CommentsSection>
         </BlogContent>
       </PageContainer>
+
+      <ConfirmDialog
+        title="Delete Blog"
+        message="Are you sure you want to delete this blog? This action cannot be undone."
+        isOpen={showDeleteConfirm}
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+        isLoading={isDeleting}
+      />
     </div>
   );
 };
