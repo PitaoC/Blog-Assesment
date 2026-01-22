@@ -3,7 +3,9 @@ import styled from 'styled-components';
 
 export interface CommentData {
   id: string;
-  author: string;
+  author?: string;
+  author_name?: string;
+  author_id?: string;
   content: string;
   image_url?: string;
   created_at: string;
@@ -120,6 +122,12 @@ const Comment: React.FC<CommentProps> = ({ comment, currentUserId, onDelete, onE
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  const getDisplayAuthor = () => {
+    const name = comment.author || comment.author_name;
+    if (!name) return 'Anonymous User';
+    return name;
+  };
+
   const getInitials = (name?: string) => {
     if (!name) return 'AN';
     return name
@@ -179,11 +187,14 @@ const Comment: React.FC<CommentProps> = ({ comment, currentUserId, onDelete, onE
     setIsEditing(false);
   };
 
+  const displayAuthor = getDisplayAuthor();
+  const isAnonymous = !displayAuthor || displayAuthor.toLowerCase() === 'anonymous user' || displayAuthor.toLowerCase() === 'anonymous';
+
   return (
     <CommentWrapper>
       <AvatarPlaceholder>
-        {comment.author && comment.author !== 'Anonymous' ? (
-          getInitials(comment.author)
+        {!isAnonymous ? (
+          getInitials(displayAuthor)
         ) : (
           <svg
             viewBox="0 0 24 24"
@@ -196,7 +207,7 @@ const Comment: React.FC<CommentProps> = ({ comment, currentUserId, onDelete, onE
       </AvatarPlaceholder>
       <CommentContent>
         <CommentHeader>
-          <span className="author-name">{comment.author || 'Anonymous'}</span>
+          <span className="author-name">{isAnonymous ? 'Anonymous User' : displayAuthor}</span>
           <span className="comment-date">{formatDate(comment.created_at)}</span>
         </CommentHeader>
         {isEditing ? (
@@ -233,7 +244,7 @@ const Comment: React.FC<CommentProps> = ({ comment, currentUserId, onDelete, onE
             {comment.image_url && (
               <CommentImage src={comment.image_url} alt="Comment attachment" />
             )}
-            {currentUserId && (
+            {currentUserId && currentUserId === comment.author_id && (
               <CommentActions>
                 <button onClick={() => setIsEditing(true)}>Edit</button>
                 <button className="delete-btn" onClick={handleDelete} disabled={isDeleting}>

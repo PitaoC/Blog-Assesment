@@ -264,6 +264,14 @@ const AddComment: React.FC<AddCommentProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
 
+  const getDisplayName = () => {
+    if (userId && userName) {
+      const [namePart] = userName.split('@');
+      return namePart || 'Anonymous User';
+    }
+    return userName || 'Anonymous User';
+  };
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -312,6 +320,7 @@ const AddComment: React.FC<AddCommentProps> = ({
   const handleSubmit = async () => {
     if (!commentText.trim() || isSubmitting) return;
 
+    const displayName = getDisplayName();
     setIsSubmitting(true);
     try {
       let imageUrl: string | null = null;
@@ -324,7 +333,7 @@ const AddComment: React.FC<AddCommentProps> = ({
         {
           blog_id: blogId,
           author_id: userId || null,
-          author_name: userName,
+          author_name: displayName,
           content: commentText.trim(),
           image_url: imageUrl,
         },
@@ -370,8 +379,8 @@ const AddComment: React.FC<AddCommentProps> = ({
     <AddCommentWrapper>
       <CommentInputSection>
         <AvatarPlaceholder>
-          {userName && userName !== 'Anonymous User' ? (
-            getInitials(userName)
+          {getDisplayName() && getDisplayName() !== 'Anonymous User' ? (
+            getInitials(getDisplayName())
           ) : (
             <svg
               viewBox="0 0 24 24"
