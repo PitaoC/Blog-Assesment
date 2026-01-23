@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
 import ConfirmDialog from './ConfirmDialog';
+import { supabase } from '../utils/supabase';
 
 export interface CommentData {
   id: string;
@@ -110,6 +111,59 @@ const CommentActions = styled.div`
   }
 `;
 
+const ImageUploadBtn = styled.button`
+  background: #5a67d8;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: #4c51bf;
+  }
+`;
+
+const EditImagePreview = styled.div`
+  margin-top: 8px;
+  position: relative;
+  display: inline-block;
+
+  img {
+    max-height: 120px;
+    max-width: 180px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+  }
+`;
+
+const RemoveEditImageBtn = styled.button`
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #f56565;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: #e53e3e;
+  }
+`;
+
 interface CommentProps {
   comment: CommentData;
   currentUserId?: string;
@@ -123,6 +177,9 @@ const Comment: React.FC<CommentProps> = ({ comment, currentUserId, onDelete, onE
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [editImageFile, setEditImageFile] = useState<File | null>(null);
+  const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
+  const [currentEditImageUrl, setCurrentEditImageUrl] = useState<string | null>(null);
 
   const getDisplayAuthor = () => {
     const name = comment.author || comment.author_name;
@@ -176,12 +233,59 @@ const Comment: React.FC<CommentProps> = ({ comment, currentUserId, onDelete, onE
     setShowDeleteConfirm(true);
   };
 
+  const uploadCommentImage = async (file: File): Promise<string | null> => {
+    try {
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      const { data, error } = await supabase.storage
+        .from('comment-images')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data: publicUrlData } = supabase.storage
+        .from('comment-images')
+        .getPublicUrl(data.path);
+
+      return publicUrlData.publicUrl;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      return null;
+    }
+  };
+
   const handleEditSave = async () => {
-    if (isSaving || !onEdit || !editedContent.trim()) return;
+    if (isSaving || !onEdit) return;
     setIsSaving(true);
     try {
-      await onEdit(comment.id, editedContent.trim());
+      let imageUrl = currentEditImageUrl;
+
+      // Upload new image if provided
+      if (editImageFile) {
+        imageUrl = await uploadCommentImage(editImageFile);
+      }
+
+      // Update comment with text and image
+      const { error } = await supabase
+        .from('comments')
+        .update({ 
+          content: editedContent.trim() || '',
+          image_url: imageUrl 
+        })
+        .eq('id', comment.id);
+
+      if (error) throw error;
+
+      // Update local state to reflect changes
+      comment.content = editedContent.trim() || '';
+      comment.image_url = imageUrl || undefined;
+      
       setIsEditing(false);
+      setEditImageFile(null);
+      setEditImagePreview(null);
+      setCurrentEditImageUrl(null);
+    } catch (error) {
+      console.error('Error updating comment:', error);
+      alert('Failed to update comment');
     } finally {
       setIsSaving(false);
     }
@@ -189,6 +293,9 @@ const Comment: React.FC<CommentProps> = ({ comment, currentUserId, onDelete, onE
 
   const handleEditCancel = () => {
     setEditedContent(comment.content);
+    setEditImageFile(null);
+    setEditImagePreview(null);
+    setCurrentEditImageUrl(comment.image_url || null);
     setIsEditing(false);
   };
 
@@ -232,10 +339,49 @@ const Comment: React.FC<CommentProps> = ({ comment, currentUserId, onDelete, onE
               onChange={(e) => setEditedContent(e.target.value)}
               disabled={isSaving}
             />
+            <ImageUploadBtn
+              type="button"
+              onClick={() => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*';
+                input.onchange = (e: Event) => {
+                  const file = (e.target as HTMLInputElement).files?.[0];
+                  if (file) {
+                    setEditImageFile(file);
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                      setEditImagePreview(event.target?.result as string);
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                };
+                input.click();
+              }}
+              disabled={isSaving}
+            >
+              {editImageFile ? '📷 Change Image' : comment.image_url ? '📷 Replace Image' : '📷 Add Image'}
+            </ImageUploadBtn>
+            {(editImagePreview || currentEditImageUrl) && (
+              <EditImagePreview>
+                <img src={editImagePreview || currentEditImageUrl || ''} alt="Preview" />
+                <RemoveEditImageBtn
+                  type="button"
+                  onClick={() => {
+                    setEditImageFile(null);
+                    setEditImagePreview(null);
+                    setCurrentEditImageUrl(null);
+                  }}
+                  disabled={isSaving}
+                >
+                  ✕
+                </RemoveEditImageBtn>
+              </EditImagePreview>
+            )}
             <CommentActions>
               <button
                 onClick={handleEditSave}
-                disabled={isSaving || !editedContent.trim()}
+                disabled={isSaving}
               >
                 {isSaving ? 'Saving...' : 'Save'}
               </button>
@@ -252,7 +398,11 @@ const Comment: React.FC<CommentProps> = ({ comment, currentUserId, onDelete, onE
             )}
             {currentUserId && currentUserId === comment.author_id && (
               <CommentActions>
-                <button onClick={() => setIsEditing(true)}>Edit</button>
+                <button onClick={() => {
+                  setIsEditing(true);
+                  setCurrentEditImageUrl(comment.image_url || null);
+                  setEditImagePreview(comment.image_url || null);
+                }}>Edit</button>
                 <button className="delete-btn" onClick={handleDeleteClick} disabled={isDeleting}>
                   {isDeleting ? 'Deleting...' : 'Delete'}
                 </button>
