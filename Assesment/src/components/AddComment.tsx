@@ -318,7 +318,7 @@ const AddComment: React.FC<AddCommentProps> = ({
   };
 
   const handleSubmit = async () => {
-    if (!commentText.trim() || isSubmitting) return;
+    if ((!commentText.trim() && !imageFile) || isSubmitting) return;
 
     const displayName = getDisplayName();
     setIsSubmitting(true);
@@ -334,7 +334,7 @@ const AddComment: React.FC<AddCommentProps> = ({
           blog_id: blogId,
           author_id: userId || null,
           author_name: displayName,
-          content: commentText.trim(),
+          content: commentText.trim() || '',
           image_url: imageUrl,
         },
       ]);
@@ -452,7 +452,7 @@ const AddComment: React.FC<AddCommentProps> = ({
         </CancelBtn>
         <SubmitBtn
           onClick={handleSubmit}
-          disabled={!commentText.trim() || isSubmitting}
+          disabled={(!commentText.trim() && !imageFile) || isSubmitting}
         >
           {isSubmitting ? 'Posting...' : 'Post Comment'}
         </SubmitBtn>

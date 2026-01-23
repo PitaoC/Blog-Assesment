@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
+import ConfirmDialog from './ConfirmDialog';
 
 export interface CommentData {
   id: string;
@@ -121,6 +122,7 @@ const Comment: React.FC<CommentProps> = ({ comment, currentUserId, onDelete, onE
   const [editedContent, setEditedContent] = useState(comment.content);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const getDisplayAuthor = () => {
     const name = comment.author || comment.author_name;
@@ -161,14 +163,17 @@ const Comment: React.FC<CommentProps> = ({ comment, currentUserId, onDelete, onE
 
   const handleDelete = async () => {
     if (isDeleting || !onDelete) return;
-    if (window.confirm('Are you sure you want to delete this comment?')) {
-      setIsDeleting(true);
-      try {
-        await onDelete(comment.id);
-      } finally {
-        setIsDeleting(false);
-      }
+    setIsDeleting(true);
+    try {
+      await onDelete(comment.id);
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
     }
+  };
+
+  const handleDeleteClick = () => {
+    setShowDeleteConfirm(true);
   };
 
   const handleEditSave = async () => {
@@ -191,7 +196,8 @@ const Comment: React.FC<CommentProps> = ({ comment, currentUserId, onDelete, onE
   const isAnonymous = !displayAuthor || displayAuthor.toLowerCase() === 'anonymous user' || displayAuthor.toLowerCase() === 'anonymous';
 
   return (
-    <CommentWrapper>
+    <>
+      <CommentWrapper>
       <AvatarPlaceholder>
         {!isAnonymous ? (
           getInitials(displayAuthor)
@@ -247,7 +253,7 @@ const Comment: React.FC<CommentProps> = ({ comment, currentUserId, onDelete, onE
             {currentUserId && currentUserId === comment.author_id && (
               <CommentActions>
                 <button onClick={() => setIsEditing(true)}>Edit</button>
-                <button className="delete-btn" onClick={handleDelete} disabled={isDeleting}>
+                <button className="delete-btn" onClick={handleDeleteClick} disabled={isDeleting}>
                   {isDeleting ? 'Deleting...' : 'Delete'}
                 </button>
               </CommentActions>
@@ -256,6 +262,17 @@ const Comment: React.FC<CommentProps> = ({ comment, currentUserId, onDelete, onE
         )}
       </CommentContent>
     </CommentWrapper>
+    {showDeleteConfirm && (
+      <ConfirmDialog
+        title="Delete Comment"
+        message="Are you sure you want to delete this comment? This action cannot be undone."
+        isOpen={showDeleteConfirm}
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+        isLoading={isDeleting}
+      />
+    )}
+    </>
   );
 };
 
