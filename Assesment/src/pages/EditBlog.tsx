@@ -162,10 +162,87 @@ const CancelBtn = styled.button`
   }
 `;
 
+const ImagePreviewContainer = styled.div`
+  margin-top: 15px;
+  text-align: center;
+
+  img {
+    max-width: 300px;
+    max-height: 300px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    object-fit: cover;
+    display: block;
+    margin: 0 auto;
+  }
+`;
+
+const ImageUploadLabel = styled.label`
+  display: inline-block;
+  padding: 12px 20px;
+  background: #5a67d8;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  margin-bottom: 10px;
+
+  &:hover {
+    background: #4c51bf;
+  }
+
+  input[type='file'] {
+    display: none;
+  }
+
+  @media (max-width: 480px) {
+    width: 100%;
+    text-align: center;
+    display: block;
+    padding: 12px 16px;
+  }
+`;
+
+const ImageFileName = styled.div`
+  color: #4a5568;
+  font-size: 14px;
+  margin-top: 8px;
+  font-weight: 500;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+`;
+
+const RemoveImageBtn = styled.button`
+  background: rgba(82, 82, 82, 0.9);
+  color: white;
+  padding: 4px 8px;
+  font-size: 16px;
+  border-radius: 4px;
+  border: none;
+  transition: all 0.3s ease;
+  opacity: 0.7;
+  cursor: pointer;
+  margin-left: 10px;
+  vertical-align: middle;
+
+  &:hover {
+    opacity: 1;
+    background: rgba(220, 38, 38, 0.95);
+    transform: scale(1.1);
+  }
+`;
+
 const EditBlog: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [image, setImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
+  const [currentImageUrl, setCurrentImageUrl] = useState<string>('');
+  const [uploading, setUploading] = useState(false);
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
@@ -176,6 +253,10 @@ const EditBlog: React.FC = () => {
       if (data) {
         setTitle(data.title);
         setContent(data.content);
+        if (data.image_url) {
+          setCurrentImageUrl(data.image_url);
+          setImagePreview(data.image_url);
+        }
       }
     };
     fetchBlog();
@@ -184,15 +265,51 @@ const EditBlog: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id) return;
-    const { data, error } = await supabase
-      .from('blogs')
-      .update({ title, content, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .select()
-      .single();
-    if (!error && data) {
-      dispatch(updateBlog(data));
-      navigate('/blogs');
+    
+    setUploading(true);
+    let imageUrl = currentImageUrl;
+
+    try {
+      if (image) {
+        const fileExt = image.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('blog-images')
+          .upload(`${fileName}`, image);
+
+        if (uploadError) {
+          console.error('Error uploading image:', uploadError);
+          setUploading(false);
+          return;
+        }
+        const { data: publicData } = supabase.storage
+          .from('blog-images')
+          .getPublicUrl(`${fileName}`);
+
+        imageUrl = publicData.publicUrl;
+      }
+
+      const { data, error } = await supabase
+        .from('blogs')
+        .update({ 
+          title, 
+          content, 
+          image_url: imageUrl,
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (!error && data) {
+        dispatch(updateBlog(data));
+        navigate('/blogs');
+      }
+    } catch (err) {
+      console.error('Update error:', err);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -215,6 +332,47 @@ const EditBlog: React.FC = () => {
             />
           </FormGroup>
           <FormGroup>
+            <label>Blog Image</label>
+            <ImageUploadLabel>
+              📸 {image ? 'Change Image' : currentImageUrl ? 'Replace Image' : 'Upload Image'}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    setImage(file);
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                      setImagePreview(event.target?.result as string);
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                }}
+              />
+            </ImageUploadLabel>
+            {(image || currentImageUrl) && (
+              <ImageFileName>
+                <span>{image ? `New image: ${image.name}` : 'Current image'}</span>
+                <RemoveImageBtn
+                  type="button"
+                  onClick={() => {
+                    setImage(null);
+                    setImagePreview('');
+                    setCurrentImageUrl('');
+                  }}
+                >
+                  🗑️
+                </RemoveImageBtn>
+              </ImageFileName>
+            )}
+            {imagePreview && (
+              <ImagePreviewContainer>
+                <img src={imagePreview} alt="Preview" />
+              </ImagePreviewContainer>
+            )}
+          </FormGroup>
+          <FormGroup>
             <label htmlFor="content">Content</label>
             <textarea
               id="content"
@@ -227,7 +385,9 @@ const EditBlog: React.FC = () => {
             />
           </FormGroup>
           <ButtonGroup>
-            <SubmitBtn type="submit">Update Blog</SubmitBtn>
+            <SubmitBtn type="submit" disabled={uploading}>
+              {uploading ? 'Updating...' : 'Update Blog'}
+            </SubmitBtn>
             <CancelBtn type="button" onClick={() => navigate('/blogs')}>Cancel</CancelBtn>
           </ButtonGroup>
         </Form>

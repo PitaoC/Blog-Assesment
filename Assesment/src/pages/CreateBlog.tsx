@@ -194,9 +194,33 @@ const ImageUploadLabel = styled.label`
 
 const ImageFileName = styled.div`
   color: #4a5568;
+  border: 1px solid #3d3d3d;
   font-size: 14px;
   margin-top: 8px;
   font-weight: 500;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+`;
+
+const RemoveImageBtn = styled.button`
+  background: rgba(82, 82, 82, 0.9);
+  color: white;
+  padding: 4px 8px;
+  font-size: 16px;
+  border-radius: 4px;
+  border: none;
+  transition: all 0.3s ease;
+  opacity: 0.7;
+  cursor: pointer;
+  margin-left: 10px;
+  vertical-align: middle;
+
+  &:hover {
+    opacity: 1;
+    background: rgba(220, 38, 38, 0.95);
+    transform: scale(1.1);
+  }
 `;
 
 const CreateBlog: React.FC = () => {
@@ -326,7 +350,20 @@ const CreateBlog: React.FC = () => {
                 }}
               />
             </ImageUploadLabel>
-            {image && <ImageFileName>Selected: {image.name}</ImageFileName>}
+            {image && (
+              <ImageFileName>
+                <span>Selected: {image.name}</span>
+                <RemoveImageBtn
+                  type="button"
+                  onClick={() => {
+                    setImage(null);
+                    setImagePreview('');
+                  }}
+                >
+                  🗑️
+                </RemoveImageBtn>
+              </ImageFileName>
+            )}
             {imagePreview && (
               <ImagePreviewContainer>
                 <img src={imagePreview} alt="Preview" />
