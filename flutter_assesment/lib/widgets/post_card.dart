@@ -10,10 +10,28 @@ class PostCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: ListTile(
-        title: Text(post.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-        subtitle: Text(post.excerpt, maxLines: 2, overflow: TextOverflow.ellipsis),
-        onTap: onTap,
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: ListTile(
+              title: Text(post.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text(post.content),
+              onTap: onTap,
+            ),
+          ),
+          Row(
+            children: <Widget>[
+              IconButton(
+                icon: const Icon(Icons.thumb_up),
+                onPressed: () {},
+              ),
+              IconButton(
+                icon: const Icon(Icons.thumb_down),
+                onPressed: () {},
+              ),
+            ],
+          )
+        ]
       ),
     );
   }

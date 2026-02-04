@@ -9,12 +9,20 @@ class HomeScreen extends StatelessWidget {
         Post(
           id: '1',
           title: 'Hello Flutter',
-          excerpt: 'Migrating from React to Flutter.',
+          content: 'Migrating from React to Flutter.',
+          authorId: 'author1',
+          imageUrl: null,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
         ),
         Post(
           id: '2',
           title: 'State Management',
-          excerpt: 'Provider vs Riverpod vs Bloc.',
+          content: 'Provider vs Riverpod vs Bloc.',
+          authorId: 'author2',
+          imageUrl: null,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
         ),
       ];
 
@@ -23,7 +31,11 @@ class HomeScreen extends StatelessWidget {
     final posts = _mockPosts();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Blog')),
+      appBar: AppBar(
+        title: const Text('📝 BlogHub'),
+        backgroundColor: const Color(0xFF5A67D8),
+        foregroundColor: Colors.white,
+      ),
       body: ListView.builder(
         padding: const EdgeInsets.all(12),
         itemCount: posts.length,

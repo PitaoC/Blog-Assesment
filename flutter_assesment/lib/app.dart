@@ -8,9 +8,17 @@ class BlogApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Flutter Blog',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.indigo,
+          brightness: Brightness.light,
+          ),
         useMaterial3: true,
+        appBarTheme: const AppBarTheme(
+          centerTitle: true,
+          elevation: 0,
+        ),
       ),
       initialRoute: '/',
       routes: {
