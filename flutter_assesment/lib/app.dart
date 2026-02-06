@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'screens/home_screen.dart';
+import 'screens/login_screen.dart';
+
 
 class BlogApp extends StatelessWidget {
   const BlogApp({super.key});
@@ -22,7 +23,7 @@ class BlogApp extends StatelessWidget {
       ),
       initialRoute: '/',
       routes: {
-        '/': (_) => const HomeScreen(),
+        '/': (_) => const LoginScreen(),
       },
     );
   }
