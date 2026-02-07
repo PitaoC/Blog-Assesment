@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'screens/login_screen.dart';
+import 'screens/home_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'main.dart';
 
 
 class BlogApp extends StatelessWidget {
@@ -21,10 +24,16 @@ class BlogApp extends StatelessWidget {
           elevation: 0,
         ),
       ),
-      initialRoute: '/',
-      routes: {
-        '/': (_) => const LoginScreen(),
-      },
+      home: StreamBuilder<AuthState>(
+        stream: supabase.auth.onAuthStateChange,
+        builder: (context, snapshot) {
+          final user = supabase.auth.currentUser;
+          if (user != null) {
+            return const HomeScreen();
+          }
+          return const LoginScreen();
+        },
+      ),
     );
   }
 }
