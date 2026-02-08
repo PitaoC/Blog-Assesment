@@ -8,6 +8,16 @@ class AuthService {
 
   Stream<AuthState> get authStateChanges => supabase.auth.onAuthStateChange;
 
+  Future<AuthResponse> register({
+    required String email,
+    required String password,
+  }) async {
+    return await supabase.auth.signUp(
+      email: email,
+      password: password,
+    );
+  }
+
   Future<AuthResponse> login({
     required String email,
     required String password,
