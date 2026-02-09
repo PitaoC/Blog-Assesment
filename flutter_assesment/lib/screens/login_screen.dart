@@ -68,7 +68,6 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Logo
                 const Text(
                   '📝 BlogHub',
                   style: TextStyle(
@@ -96,7 +95,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 40),
 
-                // Form Card
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
@@ -115,7 +113,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Error Message
                         if (_errorMessage != null)
                           Container(
                             padding: const EdgeInsets.all(12),
@@ -134,7 +131,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
 
-                        // Email Field
                         TextFormField(
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
@@ -166,7 +162,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 16),
 
-                        // Password Field
                         TextFormField(
                           controller: _passwordController,
                           obscureText: true,
@@ -198,7 +193,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 24),
 
-                        // Login Button
                         ElevatedButton(
                           onPressed: _isLoading ? null : _handleLogin,
                           style: ElevatedButton.styleFrom(
@@ -233,7 +227,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Register Link
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
