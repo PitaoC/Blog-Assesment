@@ -27,11 +27,7 @@ class BlogApp extends StatelessWidget {
       home: StreamBuilder<AuthState>(
         stream: supabase.auth.onAuthStateChange,
         builder: (context, snapshot) {
-          final user = supabase.auth.currentUser;
-          if (user != null) {
-            return const HomeScreen();
-          }
-          return const LoginScreen();
+          return const HomeScreen();
         },
       ),
     );

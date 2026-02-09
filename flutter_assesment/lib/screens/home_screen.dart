@@ -76,6 +76,11 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           if (currentUser != null) ...[
             IconButton(
+              icon: const Icon(Icons.add),
+              onPressed: () async {
+              },
+            ),
+            IconButton(
               icon: const Icon(Icons.logout),
               onPressed: _handleLogout,
             ),
