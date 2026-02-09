@@ -4,6 +4,7 @@ import '../widgets/post_card.dart';
 import '../services/blog_service.dart';
 import '../services/auth_service.dart';
 import 'login_screen.dart';
+import 'view_blog_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -179,6 +180,12 @@ class _HomeScreenState extends State<HomeScreen> {
           post: blog,
           isOwner: isOwner,
           onTap: () async {
+            await Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ViewBlogScreen(blogId: blog.id),
+              ),
+            );
+            _loadBlogs();
           },
         );
       },
