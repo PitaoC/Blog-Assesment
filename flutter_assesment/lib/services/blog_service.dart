@@ -24,5 +24,25 @@ class BlogService {
 
     return Post.fromJson(response);
   }
+  
+  Future<Post> createBlog({
+    required String title,
+    required String content,
+    required String authorId,
+    String? imageUrl,
+  }) async {
+    final response = await supabase
+        .from('blogs')
+        .insert({
+          'title': title.trim(),
+          'content': content.trim(),
+          'author_id': authorId,
+          'image_url': imageUrl,
+        })
+        .select()
+        .single();
+
+    return Post.fromJson(response);
+  }
 
 }

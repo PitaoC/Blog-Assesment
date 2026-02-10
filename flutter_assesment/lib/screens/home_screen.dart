@@ -5,6 +5,7 @@ import '../services/blog_service.dart';
 import '../services/auth_service.dart';
 import 'login_screen.dart';
 import 'view_blog_screen.dart';
+import 'create_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -78,6 +79,12 @@ class _HomeScreenState extends State<HomeScreen> {
             IconButton(
               icon: const Icon(Icons.add),
               onPressed: () async {
+                final result = await Navigator.of(context).push<bool>(
+                  MaterialPageRoute(builder: (_) => const CreateBlogScreen()),
+                );
+                if (result == true) {
+                  _loadBlogs();
+                }
               },
             ),
             IconButton(
