@@ -53,7 +53,46 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _deleteBlog(Post blog) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Blog'),
+        content: const Text('Are you sure you want to delete this blog? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
 
+    if (confirm == true) {
+      try {
+        await _blogService.deleteBlog(blog.id);
+        setState(() {
+          _blogs.removeWhere((b) => b.id == blog.id);
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Blog deleted successfully')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete blog: $e')),
+          );
+        }
+      }
+    }
+  }
 
   void _handleLogout() async {
     await _authService.logout();
@@ -199,6 +238,7 @@ class _HomeScreenState extends State<HomeScreen> {
             );
             _loadBlogs();
           },
+          onDelete: () => _deleteBlog(blog),
         );
       },
     );

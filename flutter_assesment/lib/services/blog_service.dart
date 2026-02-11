@@ -45,4 +45,8 @@ class BlogService {
     return Post.fromJson(response);
   }
 
+  Future<void> deleteBlog(String id) async {
+    await supabase.from('blogs').delete().eq('id', id);
+  }
+
 }
