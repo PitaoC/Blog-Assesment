@@ -3,6 +3,11 @@ import '../models/post.dart';
 import '../services/blog_service.dart';
 import '../services/auth_service.dart';
 import 'edit_screen.dart';
+import '../models/comment.dart';
+import '../services/comment_service.dart';
+import '../widgets/comment_item.dart';
+import '../widgets/add_comment.dart';
+import 'login_screen.dart';
 
 
 class ViewBlogScreen extends StatefulWidget {
@@ -17,16 +22,21 @@ class ViewBlogScreen extends StatefulWidget {
 class _ViewBlogScreenState extends State<ViewBlogScreen> {
   final BlogService _blogService = BlogService();
   final AuthService _authService = AuthService();
+  final CommentService _commentService = CommentService();
 
   Post? _blog;
   bool _isLoading = true;
   String? _error;
   bool _isDeleting = false;
+  List<Comment> _comments = [];
+  bool _isLoadingComments = false;
+  bool _isAddingComment = false;
 
   @override
   void initState() {
     super.initState();
     _loadBlog();
+    _loadComments();
   }
 
   Future<void> _loadBlog() async {
@@ -104,6 +114,70 @@ class _ViewBlogScreenState extends State<ViewBlogScreen> {
     ];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
+
+  Future<void> _loadComments() async {
+    setState(() {
+      _isLoadingComments = true;
+    });
+
+    try {
+      final comments = await _commentService.getComments(widget.blogId);
+      setState(() {
+        _comments = comments;
+        _isLoadingComments = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoadingComments = false;
+      });
+    }
+  }
+
+  Future<void> _addComment(String content) async {
+    final user = _authService.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please login to comment'),
+          action: SnackBarAction(
+            label: 'Login',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+              );
+            },
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isAddingComment = true;
+    });
+
+    try {
+      final comment = await _commentService.addComment(
+        blogId: widget.blogId,
+        authorId: user.id,
+        content: content,
+      );
+      setState(() {
+        _comments.insert(0, comment);
+        _isAddingComment = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isAddingComment = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to add comment: $e')),
+        );
+      }
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -197,6 +271,7 @@ class _ViewBlogScreenState extends State<ViewBlogScreen> {
         ),
       );
     }
+    final currentUser = _authService.currentUser;
 
     return SingleChildScrollView(
       child: Column(
@@ -281,25 +356,87 @@ class _ViewBlogScreenState extends State<ViewBlogScreen> {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: const Color(0xFFE2E8F0)),
                   ),
-                  child: const Column(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        '💬 Comments',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF2D3748),
-                        ),
+                      Row(
+                        children: [
+                          const Text(
+                            '💬 Comments',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF2D3748),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF5A67D8),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '${_comments.length}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      SizedBox(height: 12),
-                      Text(
-                        'No comment',
-                        style: TextStyle(
-                          color: Color(0xFF718096),
-                          fontStyle: FontStyle.italic,
-                        ),
+                      const SizedBox(height: 20),
+
+                      AddComment(
+                        onSubmit: _addComment,
+                        isLoading: _isAddingComment,
                       ),
+                      const SizedBox(height: 24),
+
+                      if (_isLoadingComments)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(20),
+                            child: CircularProgressIndicator(
+                              color: Color(0xFF5A67D8),
+                            ),
+                          ),
+                        )
+                      else if (_comments.isEmpty)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(20),
+                            child: Text(
+                              'No comments yet. Be the first to comment!',
+                              style: TextStyle(
+                                color: Color(0xFF718096),
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ),
+                        )
+                      else
+                        ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _comments.length,
+                          itemBuilder: (context, index) {
+                            final comment = _comments[index];
+                            final isCommentOwner = currentUser?.id == comment.authorId;
+
+                            return CommentItem(
+                              comment: comment,
+                              isOwner: isCommentOwner,
+                              onEdit: (content) => (comment.id, content),
+                              onDelete: () => (comment.id),
+                            );
+                          },
+                        ),
                     ],
                   ),
                 ),
