@@ -45,6 +45,27 @@ class BlogService {
     return Post.fromJson(response);
   }
 
+  Future<Post> updateBlog({
+    required String id,
+    required String title,
+    required String content,
+    String? imageUrl,
+  }) async {
+    final response = await supabase
+        .from('blogs')
+        .update({
+          'title': title.trim(),
+          'content': content.trim(),
+          'image_url': imageUrl,
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+    return Post.fromJson(response);
+  }
+
   Future<void> deleteBlog(String id) async {
     await supabase.from('blogs').delete().eq('id', id);
   }

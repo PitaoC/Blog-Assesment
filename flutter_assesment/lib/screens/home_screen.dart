@@ -6,6 +6,7 @@ import '../services/auth_service.dart';
 import 'login_screen.dart';
 import 'view_blog_screen.dart';
 import 'create_screen.dart';
+import 'edit_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -237,6 +238,16 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             );
             _loadBlogs();
+          },
+          onEdit: () async {
+            final result = await Navigator.of(context).push<bool>(
+              MaterialPageRoute(
+                builder: (_) => EditBlogScreen(blogId: blog.id),
+              ),
+            );
+            if (result == true) {
+              _loadBlogs();
+            }
           },
           onDelete: () => _deleteBlog(blog),
         );

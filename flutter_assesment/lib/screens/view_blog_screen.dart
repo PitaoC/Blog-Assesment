@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/post.dart';
 import '../services/blog_service.dart';
 import '../services/auth_service.dart';
+import 'edit_screen.dart';
 
 
 class ViewBlogScreen extends StatefulWidget {
@@ -20,6 +21,7 @@ class _ViewBlogScreenState extends State<ViewBlogScreen> {
   Post? _blog;
   bool _isLoading = true;
   String? _error;
+  bool _isDeleting = false;
 
   @override
   void initState() {
@@ -47,6 +49,53 @@ class _ViewBlogScreenState extends State<ViewBlogScreen> {
     }
   }
 
+  Future<void> _deleteBlog() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Blog'),
+        content: const Text(
+          'Are you sure you want to delete this blog? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && _blog != null) {
+      setState(() {
+        _isDeleting = true;
+      });
+
+      try {
+        await _blogService.deleteBlog(_blog!.id);
+        if (mounted) {
+          Navigator.of(context).pop(true);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete blog: $e')),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isDeleting = false;
+          });
+        }
+      }
+    }
+  }
 
   String _formatDate(DateTime date) {
     final months = [
@@ -67,6 +116,36 @@ class _ViewBlogScreenState extends State<ViewBlogScreen> {
         backgroundColor: const Color(0xFF5A67D8),
         foregroundColor: Colors.white,
         title: const Text('View Blog'),
+        actions: [
+          if (isOwner && _blog != null) ...[
+            IconButton(
+              icon: const Icon(Icons.edit),
+              onPressed: () async {
+                final result = await Navigator.of(context).push<bool>(
+                  MaterialPageRoute(
+                    builder: (_) => EditBlogScreen(blogId: _blog!.id),
+                  ),
+                );
+                if (result == true) {
+                  _loadBlog();
+                }
+              },
+            ),
+            IconButton(
+              icon: _isDeleting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.delete),
+              onPressed: _isDeleting ? null : _deleteBlog,
+            ),
+          ],
+        ],
       ),
       body: _buildBody(),
     );
@@ -194,6 +273,36 @@ class _ViewBlogScreenState extends State<ViewBlogScreen> {
                   ),
                 ),
                 const SizedBox(height: 40),
+
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '💬 Comments',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF2D3748),
+                        ),
+                      ),
+                      SizedBox(height: 12),
+                      Text(
+                        'No comment',
+                        style: TextStyle(
+                          color: Color(0xFF718096),
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
