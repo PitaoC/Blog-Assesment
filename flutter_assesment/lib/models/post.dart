@@ -28,4 +28,36 @@ class Post {
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'content': content,
+      'author_id': authorId,
+      'image_url': imageUrl,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+    };
+  }
+
+  Post copyWith({
+    String? id,
+    String? title,
+    String? content,
+    String? authorId,
+    String? imageUrl,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return Post(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      content: content ?? this.content,
+      authorId: authorId ?? this.authorId,
+      imageUrl: imageUrl ?? this.imageUrl,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
 }

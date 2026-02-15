@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/post.dart';
 import '../widgets/post_card.dart';
 import '../services/blog_service.dart';
@@ -21,11 +23,23 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Post> _blogs = [];
   bool _isLoading = true;
   String? _error;
+  late final StreamSubscription<AuthState> _authSub;
 
   @override
   void initState() {
     super.initState();
     _loadBlogs();
+    _authSub = _authService.authStateChanges.listen((_) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSub.cancel();
+    super.dispose();
   }
 
   Future<void> _loadBlogs() async {
@@ -98,7 +112,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _handleLogout() async {
     await _authService.logout();
     if (mounted) {
-      Navigator.of(context).pushReplacement(
+      Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const LoginScreen()),
       );
     }
@@ -111,6 +125,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF7FAFC),
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         backgroundColor: const Color(0xFF5A67D8),
         foregroundColor: Colors.white,
         title: const Text('📝 BlogHub'),
