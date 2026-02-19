@@ -5,6 +5,7 @@ class Comment {
   final String authorName;
   final String content;
   final String? imageUrl;
+  final String? authorPhotoUrl;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -15,6 +16,7 @@ class Comment {
     required this.authorName,
     required this.content,
     this.imageUrl,
+    this.authorPhotoUrl,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -27,6 +29,7 @@ class Comment {
       authorName: json['author_name'] as String,
       content: json['content'] as String,
       imageUrl: json['image_url'] as String?,
+      authorPhotoUrl: json['author_photo_url'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );
@@ -40,6 +43,7 @@ class Comment {
       'author_name': authorName,
       'content': content,
       'image_url': imageUrl,
+      'author_photo_url': authorPhotoUrl,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };

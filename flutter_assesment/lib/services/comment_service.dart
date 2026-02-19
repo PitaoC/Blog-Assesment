@@ -7,13 +7,34 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class CommentService {
   final _uuid = const Uuid();
   Future<List<Comment>> getComments(String blogId) async {
-    final response = await supabase
-        .from('comments')
-        .select()
-        .eq('blog_id', blogId)
-        .order('created_at', ascending: false);
+    try {
+      final response = await supabase
+          .from('comments')
+          .select('id, blog_id, author_id, author_name, content, image_url, author_photo_url, created_at, updated_at, profiles(display_name, photo_url)')
+          .eq('blog_id', blogId)
+          .order('created_at', ascending: false);
 
-    return (response as List).map((json) => Comment.fromJson(json)).toList();
+      return (response as List).map((json) {
+        final commentData = Map<String, dynamic>.from(json);
+        if (json['profiles'] != null && json['profiles'] is Map) {
+          final profiles = json['profiles'] as Map;
+          commentData['author_photo_url'] = profiles['photo_url'];
+          if (profiles['display_name'] != null) {
+            commentData['author_name'] = profiles['display_name'];
+          }
+        }
+        commentData.remove('profiles');
+        return Comment.fromJson(commentData);
+      }).toList();
+    } catch (e) {
+      final response = await supabase
+          .from('comments')
+          .select()
+          .eq('blog_id', blogId)
+          .order('created_at', ascending: false);
+
+      return (response as List).map((json) => Comment.fromJson(json)).toList();
+    }
   }
 
   Future<Comment> addComment({
@@ -30,19 +51,66 @@ class CommentService {
       imageUrl = await _uploadCommentImage(imageBytes, imageExt ?? 'jpg');
     }
 
-    final response = await supabase
-        .from('comments')
-        .insert({
-          'blog_id': blogId,
-          'author_id': authorId,
-          'author_name': authorName.trim(),
-          'content': content.trim(),
-          'image_url': imageUrl,
-        })
-        .select()
-        .single();
+    String finalAuthorName = authorName.trim();
+    String? authorPhotoUrl;
+    if (authorId != null) {
+      try {
+        final profileData = await supabase
+            .from('profiles')
+            .select('display_name, photo_url')
+            .eq('id', authorId)
+            .maybeSingle();
+        
+        if (profileData != null && profileData['display_name'] != null) {
+          finalAuthorName = profileData['display_name'];
+        }
+        if (profileData != null && profileData['photo_url'] != null) {
+          authorPhotoUrl = profileData['photo_url'];
+        }
+      } catch (e) {
+      }
+    }
 
-    return Comment.fromJson(response);
+    try {
+      final response = await supabase
+          .from('comments')
+          .insert({
+            'blog_id': blogId,
+            'author_id': authorId,
+            'author_name': finalAuthorName,
+            'author_photo_url': authorPhotoUrl,
+            'content': content.trim(),
+            'image_url': imageUrl,
+          })
+          .select('id, blog_id, author_id, author_name, content, image_url, author_photo_url, created_at, updated_at, profiles(display_name, photo_url)')
+          .single();
+
+      final commentData = Map<String, dynamic>.from(response);
+      if (response['profiles'] != null && response['profiles'] is Map) {
+        final profiles = response['profiles'] as Map;
+        commentData['author_photo_url'] = profiles['photo_url'];
+        if (profiles['display_name'] != null) {
+          commentData['author_name'] = profiles['display_name'];
+        }
+      }
+      commentData.remove('profiles');
+      return Comment.fromJson(commentData);
+    } catch (e) {
+      final response = await supabase
+          .from('comments')
+          .insert({
+            'blog_id': blogId,
+            'author_id': authorId,
+            'author_name': finalAuthorName,
+            'author_photo_url': authorPhotoUrl,
+            'content': content.trim(),
+            'image_url': imageUrl,
+          })
+          .select()
+          .single();
+
+      return Comment.fromJson(response);
+    }
   }
 
   Future<Comment> updateComment({
@@ -64,17 +132,40 @@ class CommentService {
       }
     }
 
-    final response = await supabase
-        .from('comments')
-        .update({
-          'content': content.trim(),
-          'image_url': imageUrl,
-        })
-        .eq('id', commentId)
-        .select()
-        .single();
+    try {
+      final response = await supabase
+          .from('comments')
+          .update({
+            'content': content.trim(),
+            'image_url': imageUrl,
+          })
+          .eq('id', commentId)
+          .select('id, blog_id, author_id, author_name, content, image_url, author_photo_url, created_at, updated_at, profiles(display_name, photo_url)')
+          .single();
 
-    return Comment.fromJson(response);
+      final commentData = Map<String, dynamic>.from(response);
+      if (response['profiles'] != null && response['profiles'] is Map) {
+        final profiles = response['profiles'] as Map;
+        commentData['author_photo_url'] = profiles['photo_url'];
+        if (profiles['display_name'] != null) {
+          commentData['author_name'] = profiles['display_name'];
+        }
+      }
+      commentData.remove('profiles');
+      return Comment.fromJson(commentData);
+    } catch (e) {
+      final response = await supabase
+          .from('comments')
+          .update({
+            'content': content.trim(),
+            'image_url': imageUrl,
+          })
+          .eq('id', commentId)
+          .select()
+          .single();
+
+      return Comment.fromJson(response);
+    }
   }
 
   Future<void> deleteComment(String commentId) async {

@@ -9,6 +9,7 @@ import 'login_screen.dart';
 import 'view_blog_screen.dart';
 import 'create_screen.dart';
 import 'edit_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -128,6 +129,17 @@ class _HomeScreenState extends State<HomeScreen> {
         automaticallyImplyLeading: false,
         backgroundColor: const Color(0xFF5A67D8),
         foregroundColor: Colors.white,
+        leading: currentUser != null
+            ? IconButton(
+                icon: const Icon(Icons.person),
+                onPressed: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                  );
+                  _loadBlogs();
+                },
+              )
+            : null,
         title: const Text('📝 BlogHub'),
         actions: [
           if (currentUser != null) ...[

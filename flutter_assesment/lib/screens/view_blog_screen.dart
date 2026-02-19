@@ -7,7 +7,6 @@ import '../models/comment.dart';
 import '../services/comment_service.dart';
 import '../widgets/comment_item.dart';
 import '../widgets/add_comment.dart';
-import 'login_screen.dart';
 import 'dart:typed_data';
 
 
@@ -20,7 +19,7 @@ class ViewBlogScreen extends StatefulWidget {
   State<ViewBlogScreen> createState() => _ViewBlogScreenState();
 }
 
-class _ViewBlogScreenState extends State<ViewBlogScreen> {
+class _ViewBlogScreenState extends State<ViewBlogScreen> with WidgetsBindingObserver {
   final BlogService _blogService = BlogService();
   final AuthService _authService = AuthService();
   final CommentService _commentService = CommentService();
@@ -32,12 +31,27 @@ class _ViewBlogScreenState extends State<ViewBlogScreen> {
   List<Comment> _comments = [];
   bool _isLoadingComments = false;
   bool _isAddingComment = false;
+  bool _isEditingComment = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadBlog();
     _loadComments();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && !_isEditingComment) {
+      _loadComments();
+    }
   }
 
   Future<void> _loadBlog() async {
@@ -117,17 +131,23 @@ class _ViewBlogScreenState extends State<ViewBlogScreen> {
   }
 
   Future<void> _loadComments() async {
+    if (!mounted) return;
+    
     setState(() {
       _isLoadingComments = true;
     });
 
     try {
       final comments = await _commentService.getComments(widget.blogId);
+      if (!mounted) return;
+      
       setState(() {
         _comments = comments;
         _isLoadingComments = false;
       });
     } catch (e) {
+      if (!mounted) return;
+      
       setState(() {
         _isLoadingComments = false;
       });
@@ -531,6 +551,9 @@ class _ViewBlogScreenState extends State<ViewBlogScreen> {
                                 key: ValueKey(comment.id),
                                 comment: comment,
                                 isOwner: isCommentOwner,
+                                onEditingChanged: (isEditing) {
+                                  _isEditingComment = isEditing;
+                                },
                                 onEdit: (content, newImageBytes, imageExt, removeImage) => 
                                     _editComment(
                                       comment.id,

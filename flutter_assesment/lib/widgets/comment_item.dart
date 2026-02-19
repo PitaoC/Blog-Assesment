@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/comment.dart';
+import '../widgets/user_avatar.dart';
 import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 
@@ -8,6 +9,7 @@ class CommentItem extends StatefulWidget {
   final bool isOwner;
   final Function(String content, Uint8List? newImageBytes, String? imageExt, bool removeImage) onEdit;
   final VoidCallback onDelete;
+  final Function(bool isEditing)? onEditingChanged;
 
   const CommentItem({
     super.key,
@@ -15,6 +17,7 @@ class CommentItem extends StatefulWidget {
     required this.isOwner,
     required this.onEdit,
     required this.onDelete,
+    this.onEditingChanged,
   });
 
   @override
@@ -60,12 +63,17 @@ class _CommentItemState extends State<CommentItem> {
   }
 
   void _handleCancelEdit() {
+    widget.onEditingChanged?.call(false);
     setState(() {
       _isEditing = false;
       _editController.text = widget.comment.content;
+      _newImageBytes = null;
+      _newImageExt = null;
+      _removeImage = false;
     });
   }
   Future<void> _pickImage() async {
+    widget.onEditingChanged?.call(true);
     final pickedFile = await _imagePicker.pickImage(
       source: ImageSource.gallery,
       maxWidth: 800,
@@ -76,6 +84,7 @@ class _CommentItemState extends State<CommentItem> {
     if (pickedFile != null) {
       final bytes = await pickedFile.readAsBytes();
       final ext = pickedFile.name.split('.').last;
+      if (!mounted) return;
       setState(() {
         _newImageBytes = bytes;
         _newImageExt = ext;
@@ -99,13 +108,23 @@ class _CommentItemState extends State<CommentItem> {
       _isSaving = true;
     });
 
-    await widget.onEdit(
-      _editController.text.trim(),
-      _newImageBytes,
-      _newImageExt,
-      _removeImage,
-    );
+    try {
+      await widget.onEdit(
+        _editController.text.trim(),
+        _newImageBytes,
+        _newImageExt,
+        _removeImage,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isSaving = false;
+      });
+      return;
+    }
 
+    if (!mounted) return;
+    widget.onEditingChanged?.call(false);
     setState(() {
       _isEditing = false;
       _isSaving = false;
@@ -192,25 +211,10 @@ class _CommentItemState extends State<CommentItem> {
             children: [
               Row(
                 children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF5A67D8),
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: Center(
-                      child: Text(
-                        widget.comment.authorName.isNotEmpty
-                            ? widget.comment.authorName[0].toUpperCase()
-                            : '?',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
+                  UserAvatar(
+                    photoUrl: widget.comment.authorPhotoUrl,
+                    name: widget.comment.authorName,
+                    size: 36,
                   ),
                   const SizedBox(width: 12),
                   Column(
@@ -239,7 +243,10 @@ class _CommentItemState extends State<CommentItem> {
                 Row(
                   children: [
                     GestureDetector(
-                      onTap: () => setState(() => _isEditing = true),
+                      onTap: () {
+                        widget.onEditingChanged?.call(true);
+                        setState(() => _isEditing = true);
+                      },
                       child: const Padding(
                         padding: EdgeInsets.all(4),
                         child: Icon(
