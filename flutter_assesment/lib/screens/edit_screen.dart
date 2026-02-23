@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import '../models/post.dart';
 import '../services/blog_service.dart';
 import '../services/storage_service.dart';
 
@@ -22,7 +21,6 @@ class _EditBlogScreenState extends State<EditBlogScreen> {
   final _storageService = StorageService();
   final _imagePicker = ImagePicker();
 
-  Post? _post;
   File? _selectedImage;
   String? _currentImageUrl;
   bool _isLoading = true;
@@ -47,7 +45,6 @@ class _EditBlogScreenState extends State<EditBlogScreen> {
       final blog = await _blogService.getBlogById(widget.blogId);
       if (blog != null) {
         setState(() {
-          _post = blog;
           _titleController.text = blog.title;
           _contentController.text = blog.content;
           _currentImageUrl = blog.imageUrl;
@@ -177,7 +174,7 @@ class _EditBlogScreenState extends State<EditBlogScreen> {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+                          color: Colors.black.withValues(alpha: 0.05),
                           blurRadius: 20,
                           offset: const Offset(0, 4),
                         ),

@@ -71,7 +71,8 @@ class ProfileService {
           .from('comments')
           .update(updates)
           .eq('author_id', userId);
-    } catch (e) {
+    } catch (_) {
+      // Silently ignored - sync failure is non-critical
     }
   }
 
@@ -84,7 +85,8 @@ class ProfileService {
         await supabase.storage
             .from('profile-photos')
             .remove([fileName]);
-      } catch (e) {
+      } catch (_) {
+        // Silently ignored - old file may not exist
       }
 
       await supabase.storage
@@ -103,7 +105,8 @@ class ProfileService {
           .getPublicUrl(fileName);
 
         return '$publicUrl?v=${DateTime.now().millisecondsSinceEpoch}';
-    } catch (e) {
+    } catch (_) {
+      // Upload failed
       return null;
     }
   }
@@ -114,7 +117,8 @@ class ProfileService {
       await supabase.storage
           .from('profile-photos')
           .remove([fileName]);
-    } catch (e) {
+    } catch (_) {
+      // Silently ignored - file may not exist
     }
   }
 

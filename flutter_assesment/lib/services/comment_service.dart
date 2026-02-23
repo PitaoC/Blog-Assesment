@@ -1,6 +1,6 @@
+import 'package:flutter/foundation.dart';
 import '../main.dart';
 import '../models/comment.dart';
-import 'dart:typed_data';
 import 'package:uuid/uuid.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -67,7 +67,8 @@ class CommentService {
         if (profileData != null && profileData['photo_url'] != null) {
           authorPhotoUrl = profileData['photo_url'];
         }
-      } catch (e) {
+      } catch (_) {
+        // Silently ignored - profile fetch is optional
       }
     }
 
@@ -169,7 +170,7 @@ class CommentService {
   }
 
   Future<void> deleteComment(String commentId) async {
-    print('Attempting to delete comment: $commentId');
+    debugPrint('Attempting to delete comment: $commentId');
     
     try {
       final commentData = await supabase
@@ -178,16 +179,16 @@ class CommentService {
           .eq('id', commentId)
           .maybeSingle();
       
-      print('Comment data: $commentData');
+      debugPrint('Comment data: $commentData');
       
       if (commentData != null && 
           commentData['image_url'] != null && 
           (commentData['image_url'] as String).isNotEmpty) {
-        print('Deleting image: ${commentData['image_url']}');
+        debugPrint('Deleting image: ${commentData['image_url']}');
         await deleteCommentImage(commentData['image_url']);
       }
     } catch (imageError) {
-      print('Warning: Error handling image: $imageError');
+      debugPrint('Warning: Error handling image: $imageError');
     }
     
     try {
@@ -196,9 +197,9 @@ class CommentService {
           .delete()
           .eq('id', commentId);
       
-      print('Comment deleted successfully from database');
+      debugPrint('Comment deleted successfully from database');
     } catch (e) {
-      print('Error deleting comment from database: $e');
+      debugPrint('Error deleting comment from database: $e');
       rethrow;
     }
   }
@@ -238,7 +239,7 @@ class CommentService {
 
       return publicUrl;
     } catch (e) {
-      print('Error uploading comment image: $e');
+      debugPrint('Error uploading comment image: $e');
       return null;
     }
   }
@@ -246,27 +247,27 @@ class CommentService {
   Future<void> deleteCommentImage(String imageUrl) async {
     try {
       if (imageUrl.isEmpty) {
-        print('Image URL is empty, skipping deletion');
+        debugPrint('Image URL is empty, skipping deletion');
         return;
       }
       
       final uri = Uri.parse(imageUrl);
       final pathSegments = uri.pathSegments;
       if (pathSegments.isEmpty) {
-        print('Could not extract filename from image URL');
+        debugPrint('Could not extract filename from image URL');
         return;
       }
       
       final fileName = pathSegments.last;
-      print('Attempting to delete image file: $fileName');
+      debugPrint('Attempting to delete image file: $fileName');
       
       await supabase.storage
           .from('comment-images')
           .remove([fileName]);
       
-      print('Image deleted successfully: $fileName');
+      debugPrint('Image deleted successfully: $fileName');
     } catch (e) {
-      print('Warning: Error deleting comment image from storage: $e');
+      debugPrint('Warning: Error deleting comment image from storage: $e');
     }
   }
 }

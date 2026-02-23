@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../main.dart';
 
@@ -20,7 +21,7 @@ class StorageService {
 
       return publicUrl;
     } catch (e) {
-      print('Error uploading image: $e');
+      debugPrint('Error uploading image: $e');
       return null;
     }
   }
@@ -35,7 +36,7 @@ class StorageService {
           .from('blog-images')
           .remove([fileName]);
     } catch (e) {
-      print('Error deleting image: $e');
+      debugPrint('Error deleting image: $e');
     }
   }
 }

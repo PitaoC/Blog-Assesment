@@ -88,7 +88,8 @@ class _AddCommentState extends State<AddComment> {
         _selectedImageBytes = null;
         _selectedImageExt = null;
       });
-    } catch (e) {
+    } catch (_) {
+      // Silently ignored - comment submission handled by parent
     }
   }
 

@@ -151,7 +151,7 @@ class _ViewBlogScreenState extends State<ViewBlogScreen> with WidgetsBindingObse
       setState(() {
         _isLoadingComments = false;
       });
-      print('Error loading comments: $e');
+      debugPrint('Error loading comments: $e');
     }
   }
 
