@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import '../models/post.dart';
+import '../models/user_profile.dart';
+import '../services/profile_service.dart';
+import '../widgets/user_avatar.dart';
 
-class PostCard extends StatelessWidget {
+class PostCard extends StatefulWidget {
   final Post post;
   final bool isOwner;
   final VoidCallback onTap;
@@ -18,9 +21,52 @@ class PostCard extends StatelessWidget {
   });
 
   @override
+  State<PostCard> createState() => _PostCardState();
+}
+
+class _PostCardState extends State<PostCard> {
+  final ProfileService _profileService = ProfileService();
+  UserProfile? _authorProfile;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAuthorProfile();
+  }
+
+  Future<void> _loadAuthorProfile() async {
+    try {
+      final profile = await _profileService.getUserProfile(widget.post.authorId);
+      if (mounted) {
+        setState(() {
+          _authorProfile = profile;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  String _getAuthorDisplayName() {
+    if (_authorProfile?.displayName != null && _authorProfile!.displayName!.isNotEmpty) {
+      return _authorProfile!.displayName!;
+    } else if (_authorProfile?.email != null) {
+      return _authorProfile!.email.split('@').first;
+    } else {
+      return 'Unknown Author';
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 20),
         decoration: BoxDecoration(
@@ -37,13 +83,13 @@ class PostCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (post.imageUrl != null && post.imageUrl!.isNotEmpty)
+            if (widget.post.imageUrl != null && widget.post.imageUrl!.isNotEmpty)
               ClipRRect(
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(16),
                 ),
                 child: Image.network(
-                  post.imageUrl!,
+                  widget.post.imageUrl!,
                   height: 200,
                   width: double.infinity,
                   fit: BoxFit.cover,
@@ -69,7 +115,7 @@ class PostCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    post.title,
+                    widget.post.title,
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -81,9 +127,9 @@ class PostCard extends StatelessWidget {
                   const SizedBox(height: 10),
 
                   Text(
-                    post.content.length > 150
-                        ? '${post.content.substring(0, 150)}...'
-                        : post.content,
+                    widget.post.content.length > 150
+                        ? '${widget.post.content.substring(0, 150)}...'
+                        : widget.post.content,
                     style: const TextStyle(
                       fontSize: 15,
                       color: Color(0xFF718096),
@@ -97,19 +143,87 @@ class PostCard extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        _formatDate(post.createdAt),
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFFA0AEC0),
-                        ),
-                      ),
+                      _isLoading
+                          ? Row(
+                              children: [
+                                Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE2E8F0),
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                  child: const Center(
+                                    child: SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Color(0xFF5A67D8),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      width: 80,
+                                      height: 14,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFE2E8F0),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _formatDate(widget.post.createdAt),
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: Color(0xFFA0AEC0),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            )
+                          : Row(
+                              children: [
+                                UserAvatar(
+                                  photoUrl: _authorProfile?.photoUrl,
+                                  name: _getAuthorDisplayName(),
+                                  size: 36,
+                                ),
+                                const SizedBox(width: 12),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _getAuthorDisplayName(),
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: Color(0xFF4A5568),
+                                      ),
+                                    ),
+                                    Text(
+                                      _formatDate(widget.post.createdAt),
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: Color(0xFFA0AEC0),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
 
-                      if (isOwner)
+                      if (widget.isOwner)
                         Row(
                           children: [
                             TextButton(
-                              onPressed: onEdit,
+                              onPressed: widget.onEdit,
                               style: TextButton.styleFrom(
                                 foregroundColor: const Color(0xFF5A67D8),
                                 padding: const EdgeInsets.symmetric(
@@ -120,7 +234,7 @@ class PostCard extends StatelessWidget {
                               child: const Text('Edit'),
                             ),
                             TextButton(
-                              onPressed: onDelete,
+                              onPressed: widget.onDelete,
                               style: TextButton.styleFrom(
                                 foregroundColor: Colors.red,
                                 padding: const EdgeInsets.symmetric(

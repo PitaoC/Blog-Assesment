@@ -8,12 +8,18 @@ import '../services/comment_service.dart';
 import '../widgets/comment_item.dart';
 import '../widgets/add_comment.dart';
 import 'dart:typed_data';
+import '../models/user_profile.dart';
+import '../services/profile_service.dart';
+import '../widgets/user_avatar.dart';
 
 
 class ViewBlogScreen extends StatefulWidget {
   final String blogId;
 
-  const ViewBlogScreen({super.key, required this.blogId});
+  const ViewBlogScreen({
+    super.key, 
+    required this.blogId, 
+  });
 
   @override
   State<ViewBlogScreen> createState() => _ViewBlogScreenState();
@@ -23,6 +29,8 @@ class _ViewBlogScreenState extends State<ViewBlogScreen> with WidgetsBindingObse
   final BlogService _blogService = BlogService();
   final AuthService _authService = AuthService();
   final CommentService _commentService = CommentService();
+  final ProfileService _profileService = ProfileService();
+  UserProfile? _authorProfile;
 
   Post? _blog;
   bool _isLoading = true;
@@ -66,6 +74,7 @@ class _ViewBlogScreenState extends State<ViewBlogScreen> with WidgetsBindingObse
         _blog = blog;
         _isLoading = false;
       });
+      _loadAuthorProfile();
     } catch (e) {
       setState(() {
         _error = e.toString();
@@ -265,6 +274,36 @@ class _ViewBlogScreenState extends State<ViewBlogScreen> with WidgetsBindingObse
     }
   }
 
+  Future<void> _loadAuthorProfile() async {
+    if (_blog == null) return;
+    
+    try {
+      final profile = await _profileService.getUserProfile(_blog!.authorId);
+      if (mounted) {
+        setState(() {
+          _authorProfile = profile;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  String _getAuthorDisplayName() {
+    if (_authorProfile?.displayName != null && _authorProfile!.displayName!.isNotEmpty) {
+      return _authorProfile!.displayName!;
+    } else if (_authorProfile?.email != null) {
+      return _authorProfile!.email.split('@').first;
+    } else {
+      return 'Unknown Author';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUser = _authService.currentUser;
@@ -409,22 +448,35 @@ class _ViewBlogScreenState extends State<ViewBlogScreen> with WidgetsBindingObse
                   const SizedBox(height: 16),
 
                   Row(
-                    children: [
-                      const Icon(
-                        Icons.calendar_today,
-                        size: 16,
-                        color: Color(0xFF718096),
+                        children: [
+                          UserAvatar(
+                            photoUrl: _authorProfile?.photoUrl,
+                            name: _getAuthorDisplayName(),
+                            size: 36,
+                          ),
+                          const SizedBox(width: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _getAuthorDisplayName(),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF4A5568),
+                                ),
+                              ),
+                              Text(
+                                _formatDate(_blog!.createdAt),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFFA0AEC0),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _formatDate(_blog!.createdAt),
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF718096),
-                        ),
-                      ),
-                    ],
-                  ),
                   const SizedBox(height: 24),
 
                   Container(
