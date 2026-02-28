@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class Comment {
   final String id;
   final String blogId;
@@ -33,6 +35,31 @@ class Comment {
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );
+  }
+
+  /// Parses the imageUrl field into a list of image URLs.
+  List<String> get imageUrls {
+    if (imageUrl == null || imageUrl!.isEmpty) return [];
+    final trimmed = imageUrl!.trim();
+    if (trimmed.startsWith('[')) {
+      try {
+        final decoded = jsonDecode(trimmed) as List;
+        return decoded.cast<String>().where((url) => url.isNotEmpty).toList();
+      } catch (_) {
+        return [trimmed];
+      }
+    }
+    return [trimmed];
+  }
+
+  bool get hasImages => imageUrls.isNotEmpty;
+
+  String? get firstImageUrl => hasImages ? imageUrls.first : null;
+
+  static String? encodeImageUrls(List<String> urls) {
+    if (urls.isEmpty) return null;
+    if (urls.length == 1) return urls.first;
+    return jsonEncode(urls);
   }
 
   Map<String, dynamic> toJson() {

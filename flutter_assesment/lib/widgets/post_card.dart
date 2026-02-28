@@ -63,6 +63,127 @@ class _PostCardState extends State<PostCard> {
     }
   }
 
+  Widget _buildImageCollage() {
+    final urls = widget.post.imageUrls;
+    final count = urls.length;
+
+    Widget img(String url) {
+      return Image.network(
+        url,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            color: const Color(0xFFE2E8F0),
+            child: const Center(
+              child: Icon(
+                Icons.image_not_supported,
+                size: 30,
+                color: Color(0xFF718096),
+              ),
+            ),
+          );
+        },
+      );
+    }
+
+    if (count == 1) {
+      return SizedBox(
+        height: 200,
+        width: double.infinity,
+        child: img(urls[0]),
+      );
+    }
+
+    if (count == 2) {
+      return SizedBox(
+        height: 180,
+        child: Row(
+          children: [
+            Expanded(child: img(urls[0])),
+            const SizedBox(width: 2),
+            Expanded(child: img(urls[1])),
+          ],
+        ),
+      );
+    }
+
+    if (count == 3) {
+      return SizedBox(
+        height: 200,
+        child: Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: img(urls[0]),
+            ),
+            const SizedBox(width: 2),
+            Expanded(
+              child: Column(
+                children: [
+                  Expanded(child: img(urls[1])),
+                  const SizedBox(height: 2),
+                  Expanded(child: img(urls[2])),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 4+ images: 2x2 grid with overlay for extras
+    return SizedBox(
+      height: 200,
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              children: [
+                Expanded(child: img(urls[0])),
+                const SizedBox(height: 2),
+                Expanded(child: img(urls[2])),
+              ],
+            ),
+          ),
+          const SizedBox(width: 2),
+          Expanded(
+            child: Column(
+              children: [
+                Expanded(child: img(urls[1])),
+                const SizedBox(height: 2),
+                Expanded(
+                  child: count > 4
+                      ? Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            img(urls[3]),
+                            Container(
+                              color: Colors.black45,
+                              child: Center(
+                                child: Text(
+                                  '+${count - 3}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : img(urls[3]),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -83,30 +204,12 @@ class _PostCardState extends State<PostCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (widget.post.imageUrl != null && widget.post.imageUrl!.isNotEmpty)
+            if (widget.post.hasImages)
               ClipRRect(
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(16),
                 ),
-                child: Image.network(
-                  widget.post.imageUrl!,
-                  height: 200,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      height: 200,
-                      color: const Color(0xFFE2E8F0),
-                      child: const Center(
-                        child: Icon(
-                          Icons.image_not_supported,
-                          size: 50,
-                          color: Color(0xFF718096),
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                child: _buildImageCollage(),
               ),
 
             Padding(

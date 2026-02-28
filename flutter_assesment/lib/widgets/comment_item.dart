@@ -7,7 +7,7 @@ import 'package:image_picker/image_picker.dart';
 class CommentItem extends StatefulWidget {
   final Comment comment;
   final bool isOwner;
-  final Function(String content, Uint8List? newImageBytes, String? imageExt, bool removeImage) onEdit;
+  final Function(String content, List<({Uint8List bytes, String ext})> newImages, List<String> keepImageUrls) onEdit;
   final VoidCallback onDelete;
   final Function(bool isEditing)? onEditingChanged;
 
@@ -24,14 +24,19 @@ class CommentItem extends StatefulWidget {
   State<CommentItem> createState() => _CommentItemState();
 }
 
+class _PickedImage {
+  final Uint8List bytes;
+  final String ext;
+  _PickedImage({required this.bytes, required this.ext});
+}
+
 class _CommentItemState extends State<CommentItem> {
   bool _isEditing = false;
   late TextEditingController _editController;
   bool _isSaving = false;
   final ImagePicker _imagePicker = ImagePicker();
-  Uint8List? _newImageBytes;
-  String? _newImageExt;
-  bool _removeImage = false;
+  List<_PickedImage> _newImages = [];
+  List<String> _existingImageUrls = [];
 
   @override
   void initState() {
@@ -67,37 +72,41 @@ class _CommentItemState extends State<CommentItem> {
     setState(() {
       _isEditing = false;
       _editController.text = widget.comment.content;
-      _newImageBytes = null;
-      _newImageExt = null;
-      _removeImage = false;
+      _newImages = [];
+      _existingImageUrls = [];
     });
   }
-  Future<void> _pickImage() async {
+  Future<void> _pickImages() async {
     widget.onEditingChanged?.call(true);
-    final pickedFile = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
+    final pickedFiles = await _imagePicker.pickMultiImage(
       maxWidth: 800,
       maxHeight: 800,
       imageQuality: 80,
     );
 
-    if (pickedFile != null) {
-      final bytes = await pickedFile.readAsBytes();
-      final ext = pickedFile.name.split('.').last;
+    if (pickedFiles.isNotEmpty) {
+      final List<_PickedImage> picked = [];
+      for (final xfile in pickedFiles) {
+        final bytes = await xfile.readAsBytes();
+        final ext = xfile.name.split('.').last;
+        picked.add(_PickedImage(bytes: bytes, ext: ext));
+      }
       if (!mounted) return;
       setState(() {
-        _newImageBytes = bytes;
-        _newImageExt = ext;
-        _removeImage = false;
+        _newImages.addAll(picked);
       });
     }
   }
 
-  void _handleRemoveImage() {
+  void _removeExistingImage(int index) {
     setState(() {
-      _newImageBytes = null;
-      _newImageExt = null;
-      _removeImage = true;
+      _existingImageUrls.removeAt(index);
+    });
+  }
+
+  void _removeNewImage(int index) {
+    setState(() {
+      _newImages.removeAt(index);
     });
   }
 
@@ -111,9 +120,8 @@ class _CommentItemState extends State<CommentItem> {
     try {
       await widget.onEdit(
         _editController.text.trim(),
-        _newImageBytes,
-        _newImageExt,
-        _removeImage,
+        _newImages.map((img) => (bytes: img.bytes, ext: img.ext)).toList(),
+        _existingImageUrls,
       );
     } catch (_) {
       if (!mounted) return;
@@ -128,9 +136,8 @@ class _CommentItemState extends State<CommentItem> {
     setState(() {
       _isEditing = false;
       _isSaving = false;
-      _newImageBytes = null;
-      _newImageExt = null;
-      _removeImage = false;
+      _newImages = [];
+      _existingImageUrls = [];
     });
   }
 
@@ -159,42 +166,273 @@ class _CommentItemState extends State<CommentItem> {
     }
   }
 
-  void _showFullImage(String imageUrl) {
+  void _showFullImage(String imageUrl, {int initialIndex = 0}) {
+    final urls = widget.comment.imageUrls;
+    final allUrls = urls.isNotEmpty ? urls : [imageUrl];
     showDialog(
       context: context,
       builder: (context) => Dialog(
         backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.zero,
         child: Stack(
           children: [
             Center(
-              child: InteractiveViewer(
-                child: Image.network(
-                  imageUrl,
-                  fit: BoxFit.contain,
-                ),
-              ),
+              child: allUrls.length > 1
+                  ? PageView.builder(
+                      controller: PageController(initialPage: initialIndex),
+                      itemCount: allUrls.length,
+                      itemBuilder: (context, index) {
+                        return InteractiveViewer(
+                          child: Center(
+                            child: Image.network(
+                              allUrls[index],
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) {
+                                return const Icon(Icons.image_not_supported, size: 60, color: Colors.white54);
+                              },
+                            ),
+                          ),
+                        );
+                      },
+                    )
+                  : InteractiveViewer(
+                      child: Image.network(
+                        imageUrl,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Icon(Icons.image_not_supported, size: 60, color: Colors.white54);
+                        },
+                      ),
+                    ),
             ),
             Positioned(
-              top: 10,
-              right: 10,
+              top: 40,
+              right: 16,
               child: IconButton(
                 icon: const Icon(Icons.close, color: Colors.white, size: 30),
                 onPressed: () => Navigator.pop(context),
               ),
             ),
+            if (allUrls.length > 1)
+              Positioned(
+                bottom: 40,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      'Swipe to view ${allUrls.length} photos',
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
     );
   }
 
+  Widget _buildImageCollage() {
+    final urls = widget.comment.imageUrls;
+    final count = urls.length;
+
+    Widget img(String url, int index) {
+      return GestureDetector(
+        onTap: () => _showFullImage(url, initialIndex: index),
+        child: Image.network(
+          url,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              color: const Color(0xFFE2E8F0),
+              child: const Center(
+                child: Icon(Icons.image_not_supported, size: 30, color: Color(0xFF718096)),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    if (count == 1) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: SizedBox(height: 150, width: double.infinity, child: img(urls[0], 0)),
+      );
+    }
+
+    if (count == 2) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: SizedBox(
+          height: 130,
+          child: Row(children: [
+            Expanded(child: img(urls[0], 0)),
+            const SizedBox(width: 2),
+            Expanded(child: img(urls[1], 1)),
+          ]),
+        ),
+      );
+    }
+
+    if (count == 3) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: SizedBox(
+          height: 150,
+          child: Row(children: [
+            Expanded(flex: 2, child: img(urls[0], 0)),
+            const SizedBox(width: 2),
+            Expanded(
+              child: Column(children: [
+                Expanded(child: img(urls[1], 1)),
+                const SizedBox(height: 2),
+                Expanded(child: img(urls[2], 2)),
+              ]),
+            ),
+          ]),
+        ),
+      );
+    }
+
+    // 4+ images
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: SizedBox(
+        height: 150,
+        child: Row(children: [
+          Expanded(
+            child: Column(children: [
+              Expanded(child: img(urls[0], 0)),
+              const SizedBox(height: 2),
+              Expanded(child: img(urls[2], 2)),
+            ]),
+          ),
+          const SizedBox(width: 2),
+          Expanded(
+            child: Column(children: [
+              Expanded(child: img(urls[1], 1)),
+              const SizedBox(height: 2),
+              Expanded(
+                child: count > 4
+                    ? GestureDetector(
+                        onTap: () => _showFullImage(urls[3], initialIndex: 3),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Image.network(urls[3], fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(color: const Color(0xFFE2E8F0))),
+                            Container(
+                              color: Colors.black45,
+                              child: Center(
+                                child: Text(
+                                  '+${count - 3}',
+                                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : img(urls[3], 3),
+              ),
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildEditImageGrid() {
+    final totalImages = _existingImageUrls.length + _newImages.length;
+    if (totalImages == 0) return const SizedBox.shrink();
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 6,
+        mainAxisSpacing: 6,
+      ),
+      itemCount: totalImages,
+      itemBuilder: (context, index) {
+        if (index < _existingImageUrls.length) {
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  _existingImageUrls[index],
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    color: const Color(0xFFE2E8F0),
+                    child: const Icon(Icons.image_not_supported, color: Color(0xFF718096)),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 2,
+                right: 2,
+                child: GestureDetector(
+                  onTap: () => _removeExistingImage(index),
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.close, color: Colors.white, size: 14),
+                  ),
+                ),
+              ),
+            ],
+          );
+        } else {
+          final newIndex = index - _existingImageUrls.length;
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.memory(
+                  _newImages[newIndex].bytes,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              Positioned(
+                top: 2,
+                right: 2,
+                child: GestureDetector(
+                  onTap: () => _removeNewImage(newIndex),
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.close, color: Colors.white, size: 14),
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final bool showCurrentImage = widget.comment.imageUrl != null && 
-                                   widget.comment.imageUrl!.isNotEmpty && 
-                                   !_removeImage && 
-                                   _newImageBytes == null;
-    
     return Container(
       padding: const EdgeInsets.all(16),
       margin: const EdgeInsets.only(bottom: 12),
@@ -245,7 +483,11 @@ class _CommentItemState extends State<CommentItem> {
                     GestureDetector(
                       onTap: () {
                         widget.onEditingChanged?.call(true);
-                        setState(() => _isEditing = true);
+                        setState(() {
+                          _isEditing = true;
+                          _existingImageUrls = List.from(widget.comment.imageUrls);
+                          _newImages = [];
+                        });
                       },
                       child: const Padding(
                         padding: EdgeInsets.all(4),
@@ -299,72 +541,7 @@ class _CommentItemState extends State<CommentItem> {
                 ),
                 const SizedBox(height: 12),
 
-                if (_newImageBytes != null)
-                  Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.memory(
-                          _newImageBytes!,
-                          height: 120,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                      Positioned(
-                        top: 4,
-                        right: 4,
-                        child: GestureDetector(
-                          onTap: () => setState(() => _newImageBytes = null),
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.close,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  )
-                else if (showCurrentImage)
-                  Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          widget.comment.imageUrl!,
-                          height: 120,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                      Positioned(
-                        top: 4,
-                        right: 4,
-                        child: GestureDetector(
-                          onTap: _handleRemoveImage,
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.close,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                _buildEditImageGrid(),
 
                 const SizedBox(height: 12),
 
@@ -375,12 +552,12 @@ class _CommentItemState extends State<CommentItem> {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     TextButton.icon(
-                      onPressed: _pickImage,
+                      onPressed: _pickImages,
                       icon: const Icon(Icons.image, size: 18),
                       label: Text(
-                        _newImageBytes != null || showCurrentImage
-                            ? 'Change Image'
-                            : 'Add Image',
+                        _existingImageUrls.isNotEmpty || _newImages.isNotEmpty
+                            ? 'Add More'
+                            : 'Add Images',
                       ),
                       style: TextButton.styleFrom(
                         foregroundColor: const Color(0xFF718096),
@@ -437,37 +614,10 @@ class _CommentItemState extends State<CommentItem> {
                   ),
                 ),
 
-                if (widget.comment.imageUrl != null && 
-                    widget.comment.imageUrl!.isNotEmpty)
+                if (widget.comment.hasImages)
                   Padding(
                     padding: const EdgeInsets.only(top: 12),
-                    child: GestureDetector(
-                      onTap: () => _showFullImage(widget.comment.imageUrl!),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          widget.comment.imageUrl!,
-                          height: 150,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              height: 100,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE2E8F0),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Center(
-                                child: Icon(
-                                  Icons.image_not_supported,
-                                  color: Color(0xFF718096),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
+                    child: _buildImageCollage(),
                   ),
               ],
             ),

@@ -164,7 +164,7 @@ class _ViewBlogScreenState extends State<ViewBlogScreen> with WidgetsBindingObse
     }
   }
 
-  Future<void> _addComment(String content, String authorName, Uint8List? imageBytes, String? imageExt) async {
+  Future<void> _addComment(String content, String authorName, List<({Uint8List bytes, String ext})> images) async {
     final user = _authService.currentUser;
 
     setState(() {
@@ -177,8 +177,7 @@ class _ViewBlogScreenState extends State<ViewBlogScreen> with WidgetsBindingObse
         authorId: user?.id,
         authorName: authorName,
         content: content,
-        imageBytes: imageBytes,
-        imageExt: imageExt,
+        images: images.isNotEmpty ? images : null,
       );
       
       await _loadComments();
@@ -188,7 +187,7 @@ class _ViewBlogScreenState extends State<ViewBlogScreen> with WidgetsBindingObse
       });
       
       if (mounted) {
-        if (imageBytes != null && (comment.imageUrl == null || comment.imageUrl!.isEmpty)) {
+        if (images.isNotEmpty && !comment.hasImages) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Comment posted, but image upload failed. Update your Supabase storage bucket policy to allow public uploads.'),
@@ -217,20 +216,15 @@ class _ViewBlogScreenState extends State<ViewBlogScreen> with WidgetsBindingObse
   Future<void> _editComment(
     String commentId,
     String content,
-    Uint8List? newImageBytes,
-    String? imageExt,
-    bool removeImage,
+    List<({Uint8List bytes, String ext})> newImages,
+    List<String> keepImageUrls,
   ) async {
     try {
-      final existingComment = _comments.firstWhere((c) => c.id == commentId);
-      
       final updatedComment = await _commentService.updateComment(
         commentId: commentId,
         content: content,
-        newImageBytes: newImageBytes,
-        imageExt: imageExt,
-        existingImageUrl: existingComment.imageUrl,
-        removeImage: removeImage,
+        newImages: newImages.isNotEmpty ? newImages : null,
+        keepImageUrls: keepImageUrls,
       );
       
       setState(() {
@@ -302,6 +296,219 @@ class _ViewBlogScreenState extends State<ViewBlogScreen> with WidgetsBindingObse
     } else {
       return 'Unknown Author';
     }
+  }
+
+  void _showFullImage(String imageUrl, {int initialIndex = 0}) {
+    final urls = _blog?.imageUrls ?? [imageUrl];
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          children: [
+            Center(
+              child: urls.length > 1
+                  ? PageView.builder(
+                      controller: PageController(initialPage: initialIndex),
+                      itemCount: urls.length,
+                      itemBuilder: (context, index) {
+                        return InteractiveViewer(
+                          child: Center(
+                            child: Image.network(
+                              urls[index],
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) {
+                                return const Icon(
+                                  Icons.image_not_supported,
+                                  size: 60,
+                                  color: Colors.white54,
+                                );
+                              },
+                            ),
+                          ),
+                        );
+                      },
+                    )
+                  : InteractiveViewer(
+                      child: Image.network(
+                        imageUrl,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Icon(
+                            Icons.image_not_supported,
+                            size: 60,
+                            color: Colors.white54,
+                          );
+                        },
+                      ),
+                    ),
+            ),
+            Positioned(
+              top: 40,
+              right: 16,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+            if (urls.length > 1)
+              Positioned(
+                bottom: 40,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      'Swipe to view ${urls.length} photos',
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBlogImageGrid() {
+    final urls = _blog!.imageUrls;
+    final count = urls.length;
+
+    Widget imageWidget(String url, int index) {
+      return GestureDetector(
+        onTap: () => _showFullImage(url, initialIndex: index),
+        child: Image.network(
+          url,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              color: const Color(0xFFE2E8F0),
+              child: const Center(
+                child: Icon(
+                  Icons.image_not_supported,
+                  size: 40,
+                  color: Color(0xFF718096),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    if (count == 1) {
+      return SizedBox(
+        height: 250,
+        child: imageWidget(urls[0], 0),
+      );
+    }
+
+    if (count == 2) {
+      return SizedBox(
+        height: 200,
+        child: Row(
+          children: [
+            Expanded(child: imageWidget(urls[0], 0)),
+            const SizedBox(width: 2),
+            Expanded(child: imageWidget(urls[1], 1)),
+          ],
+        ),
+      );
+    }
+
+    if (count == 3) {
+      return SizedBox(
+        height: 250,
+        child: Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: imageWidget(urls[0], 0),
+            ),
+            const SizedBox(width: 2),
+            Expanded(
+              child: Column(
+                children: [
+                  Expanded(child: imageWidget(urls[1], 1)),
+                  const SizedBox(height: 2),
+                  Expanded(child: imageWidget(urls[2], 2)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 4+ images: 2x2 grid with overlay for remaining
+    return SizedBox(
+      height: 250,
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              children: [
+                Expanded(child: imageWidget(urls[0], 0)),
+                const SizedBox(height: 2),
+                Expanded(child: imageWidget(urls[2], 2)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 2),
+          Expanded(
+            child: Column(
+              children: [
+                Expanded(child: imageWidget(urls[1], 1)),
+                const SizedBox(height: 2),
+                Expanded(
+                  child: count > 4
+                      ? GestureDetector(
+                          onTap: () => _showFullImage(urls[3], initialIndex: 3),
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Image.network(
+                                urls[3],
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    color: const Color(0xFFE2E8F0),
+                                  );
+                                },
+                              ),
+                              Container(
+                                color: Colors.black45,
+                                child: Center(
+                                  child: Text(
+                                    '+${count - 3}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : imageWidget(urls[3], 3),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -410,26 +617,8 @@ class _ViewBlogScreenState extends State<ViewBlogScreen> with WidgetsBindingObse
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (_blog!.imageUrl != null && _blog!.imageUrl!.isNotEmpty)
-              Image.network(
-                _blog!.imageUrl!,
-                height: 250,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 250,
-                    color: const Color(0xFFE2E8F0),
-                    child: const Center(
-                      child: Icon(
-                        Icons.image_not_supported,
-                        size: 60,
-                        color: Color(0xFF718096),
-                      ),
-                    ),
-                  );
-                },
-              ),
+            if (_blog!.hasImages)
+              _buildBlogImageGrid(),
 
             Padding(
               padding: const EdgeInsets.all(24),
@@ -606,13 +795,12 @@ class _ViewBlogScreenState extends State<ViewBlogScreen> with WidgetsBindingObse
                                 onEditingChanged: (isEditing) {
                                   _isEditingComment = isEditing;
                                 },
-                                onEdit: (content, newImageBytes, imageExt, removeImage) => 
+                                onEdit: (content, newImages, keepImageUrls) => 
                                     _editComment(
                                       comment.id,
                                       content,
-                                      newImageBytes,
-                                      imageExt,
-                                      removeImage,
+                                      newImages,
+                                      keepImageUrls,
                                     ),
                                 onDelete: () => _deleteComment(comment.id),
                               );

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../main.dart';
 import '../models/comment.dart';
@@ -37,18 +38,30 @@ class CommentService {
     }
   }
 
+  Future<List<String>?> uploadMultipleCommentImages(List<({Uint8List bytes, String ext})> images) async {
+    final List<String> urls = [];
+    for (final img in images) {
+      final url = await _uploadCommentImage(img.bytes, img.ext);
+      if (url == null) return null;
+      urls.add(url);
+    }
+    return urls;
+  }
+
   Future<Comment> addComment({
     required String blogId,
     String? authorId,
     required String authorName,
     required String content,
-    Uint8List? imageBytes,
-    String? imageExt,
+    List<({Uint8List bytes, String ext})>? images,
   }) async {
     String? imageUrl;
 
-    if (imageBytes != null) {
-      imageUrl = await _uploadCommentImage(imageBytes, imageExt ?? 'jpg');
+    if (images != null && images.isNotEmpty) {
+      final urls = await uploadMultipleCommentImages(images);
+      if (urls != null) {
+        imageUrl = Comment.encodeImageUrls(urls);
+      }
     }
 
     String finalAuthorName = authorName.trim();
@@ -117,21 +130,19 @@ class CommentService {
   Future<Comment> updateComment({
     required String commentId,
     required String content,
-    Uint8List? newImageBytes,
-    String? imageExt,
-    String? existingImageUrl,
-    bool removeImage = false,
+    List<({Uint8List bytes, String ext})>? newImages,
+    List<String>? keepImageUrls,
   }) async {
-    String? imageUrl = existingImageUrl;
+    List<String> allUrls = List.from(keepImageUrls ?? []);
 
-    if (removeImage) {
-      imageUrl = null;
-    } else if (newImageBytes != null) {
-      final uploadedUrl = await _uploadCommentImage(newImageBytes, imageExt ?? 'jpg');
-      if (uploadedUrl != null) {
-        imageUrl = uploadedUrl;
+    if (newImages != null && newImages.isNotEmpty) {
+      final uploadedUrls = await uploadMultipleCommentImages(newImages);
+      if (uploadedUrls != null) {
+        allUrls.addAll(uploadedUrls);
       }
     }
+
+    final imageUrl = Comment.encodeImageUrls(allUrls);
 
     try {
       final response = await supabase
@@ -184,8 +195,24 @@ class CommentService {
       if (commentData != null && 
           commentData['image_url'] != null && 
           (commentData['image_url'] as String).isNotEmpty) {
-        debugPrint('Deleting image: ${commentData['image_url']}');
-        await deleteCommentImage(commentData['image_url']);
+        final rawUrl = commentData['image_url'] as String;
+        List<String> urlsToDelete;
+        final trimmedUrl = rawUrl.trim();
+        if (trimmedUrl.startsWith('[')) {
+          try {
+            urlsToDelete = (jsonDecode(trimmedUrl) as List).cast<String>();
+          } catch (_) {
+            urlsToDelete = [trimmedUrl];
+          }
+        } else {
+          urlsToDelete = [trimmedUrl];
+        }
+        for (final url in urlsToDelete) {
+          if (url.isNotEmpty) {
+            debugPrint('Deleting image: $url');
+            await deleteCommentImage(url);
+          }
+        }
       }
     } catch (imageError) {
       debugPrint('Warning: Error handling image: $imageError');

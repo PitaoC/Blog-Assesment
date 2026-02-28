@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class Post {
   final String id;
   final String title;
@@ -16,6 +18,36 @@ class Post {
     required this.createdAt,
     required this.updatedAt,
   });
+
+  /// Parses the imageUrl field into a list of image URLs.
+  /// Supports both legacy single URL strings and JSON array strings.
+  List<String> get imageUrls {
+    if (imageUrl == null || imageUrl!.isEmpty) return [];
+    final trimmed = imageUrl!.trim();
+    if (trimmed.startsWith('[')) {
+      try {
+        final decoded = jsonDecode(trimmed) as List;
+        return decoded.cast<String>().where((url) => url.isNotEmpty).toList();
+      } catch (_) {
+        return [trimmed];
+      }
+    }
+    return [trimmed];
+  }
+
+  /// Whether this post has any images.
+  bool get hasImages => imageUrls.isNotEmpty;
+
+  /// The first image URL (for backward-compatible display like PostCard).
+  String? get firstImageUrl => hasImages ? imageUrls.first : null;
+
+  /// Encodes a list of image URLs into the stored format.
+  /// Single URL stored as-is for backward compatibility, multiple as JSON array.
+  static String? encodeImageUrls(List<String> urls) {
+    if (urls.isEmpty) return null;
+    if (urls.length == 1) return urls.first;
+    return jsonEncode(urls);
+  }
 
   factory Post.fromJson(Map<String, dynamic> json) {
     return Post(

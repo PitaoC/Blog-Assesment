@@ -1,6 +1,7 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../models/post.dart';
 import '../services/blog_service.dart';
 import '../services/auth_service.dart';
 import '../services/storage_service.dart';
@@ -12,6 +13,12 @@ class CreateBlogScreen extends StatefulWidget {
   State<CreateBlogScreen> createState() => _CreateBlogScreenState();
 }
 
+class _PickedImage {
+  final Uint8List bytes;
+  final String ext;
+  _PickedImage({required this.bytes, required this.ext});
+}
+
 class _CreateBlogScreenState extends State<CreateBlogScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
@@ -21,7 +28,7 @@ class _CreateBlogScreenState extends State<CreateBlogScreen> {
   final _storageService = StorageService();
   final _imagePicker = ImagePicker();
 
-  File? _selectedImage;
+  List<_PickedImage> _selectedImages = [];
   bool _isLoading = false;
   String? _errorMessage;
   String? _successMessage;
@@ -33,24 +40,29 @@ class _CreateBlogScreenState extends State<CreateBlogScreen> {
     super.dispose();
   }
 
-  Future<void> _pickImage() async {
-    final pickedFile = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
+  Future<void> _pickImages() async {
+    final pickedFiles = await _imagePicker.pickMultiImage(
       maxWidth: 1200,
       maxHeight: 1200,
       imageQuality: 85,
     );
 
-    if (pickedFile != null) {
+    if (pickedFiles.isNotEmpty) {
+      final List<_PickedImage> newImages = [];
+      for (final xfile in pickedFiles) {
+        final bytes = await xfile.readAsBytes();
+        final ext = xfile.name.split('.').last;
+        newImages.add(_PickedImage(bytes: bytes, ext: ext));
+      }
       setState(() {
-        _selectedImage = File(pickedFile.path);
+        _selectedImages.addAll(newImages);
       });
     }
   }
 
-  void _removeImage() {
+  void _removeImage(int index) {
     setState(() {
-      _selectedImage = null;
+      _selectedImages.removeAt(index);
     });
   }
 
@@ -74,15 +86,19 @@ class _CreateBlogScreenState extends State<CreateBlogScreen> {
     try {
       String? imageUrl;
 
-      if (_selectedImage != null) {
-        imageUrl = await _storageService.uploadImage(_selectedImage!);
-        if (imageUrl == null) {
+      if (_selectedImages.isNotEmpty) {
+        final uploads = _selectedImages
+            .map((img) => (bytes: img.bytes, ext: img.ext))
+            .toList();
+        final urls = await _storageService.uploadMultipleImages(uploads);
+        if (urls == null) {
           setState(() {
-            _errorMessage = '❌ Failed to upload image. Please try again.';
+            _errorMessage = '❌ Failed to upload images. Please try again.';
             _isLoading = false;
           });
           return;
         }
+        imageUrl = Post.encodeImageUrls(urls);
       }
 
       await _blogService.createBlog(
@@ -112,6 +128,109 @@ class _CreateBlogScreenState extends State<CreateBlogScreen> {
         });
       }
     }
+  }
+
+  Widget _buildImageGrid() {
+    return Column(
+      children: [
+        if (_selectedImages.isNotEmpty)
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+            ),
+            itemCount: _selectedImages.length,
+            itemBuilder: (context, index) {
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.memory(
+                      _selectedImages[index].bytes,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: GestureDetector(
+                      onTap: () => _removeImage(index),
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.close,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: _pickImages,
+          child: Container(
+            height: _selectedImages.isEmpty ? 150 : 60,
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: const Color(0xFFE2E8F0),
+                width: 2,
+                style: BorderStyle.solid,
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Center(
+              child: _selectedImages.isEmpty
+                  ? const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.add_photo_alternate_outlined,
+                          size: 40,
+                          color: Color(0xFF718096),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'Tap to add images',
+                          style: TextStyle(
+                            color: Color(0xFF718096),
+                          ),
+                        ),
+                      ],
+                    )
+                  : const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.add_photo_alternate_outlined,
+                          size: 24,
+                          color: Color(0xFF718096),
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Add more images',
+                          style: TextStyle(
+                            color: Color(0xFF718096),
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -234,80 +353,14 @@ class _CreateBlogScreenState extends State<CreateBlogScreen> {
                     const SizedBox(height: 20),
 
                     const Text(
-                      'Blog Image (Optional)',
+                      'Blog Images (Optional)',
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF2D3748),
                       ),
                     ),
                     const SizedBox(height: 8),
-                    if (_selectedImage != null)
-                      Stack(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.file(
-                              _selectedImage!,
-                              height: 200,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                          Positioned(
-                            top: 8,
-                            right: 8,
-                            child: GestureDetector(
-                              onTap: _removeImage,
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: const BoxDecoration(
-                                  color: Colors.red,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.close,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      )
-                    else
-                      GestureDetector(
-                        onTap: _pickImage,
-                        child: Container(
-                          height: 150,
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: const Color(0xFFE2E8F0),
-                              width: 2,
-                              style: BorderStyle.solid,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.add_photo_alternate_outlined,
-                                  size: 40,
-                                  color: Color(0xFF718096),
-                                ),
-                                SizedBox(height: 8),
-                                Text(
-                                  'Tap to add an image',
-                                  style: TextStyle(
-                                    color: Color(0xFF718096),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
+                    _buildImageGrid(),
                     const SizedBox(height: 20),
 
                     const Text(

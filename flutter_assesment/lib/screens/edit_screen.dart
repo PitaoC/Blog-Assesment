@@ -1,8 +1,15 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../models/post.dart';
 import '../services/blog_service.dart';
 import '../services/storage_service.dart';
+
+class _PickedImage {
+  final Uint8List bytes;
+  final String ext;
+  _PickedImage({required this.bytes, required this.ext});
+}
 
 class EditBlogScreen extends StatefulWidget {
   final String blogId;
@@ -21,8 +28,8 @@ class _EditBlogScreenState extends State<EditBlogScreen> {
   final _storageService = StorageService();
   final _imagePicker = ImagePicker();
 
-  File? _selectedImage;
-  String? _currentImageUrl;
+  List<_PickedImage> _newImages = [];
+  List<String> _existingImageUrls = [];
   bool _isLoading = true;
   bool _isSaving = false;
   String? _errorMessage;
@@ -47,7 +54,7 @@ class _EditBlogScreenState extends State<EditBlogScreen> {
         setState(() {
           _titleController.text = blog.title;
           _contentController.text = blog.content;
-          _currentImageUrl = blog.imageUrl;
+          _existingImageUrls = blog.imageUrls;
           _isLoading = false;
         });
       }
@@ -59,25 +66,35 @@ class _EditBlogScreenState extends State<EditBlogScreen> {
     }
   }
 
-  Future<void> _pickImage() async {
-    final pickedFile = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
+  Future<void> _pickImages() async {
+    final pickedFiles = await _imagePicker.pickMultiImage(
       maxWidth: 1200,
       maxHeight: 1200,
       imageQuality: 85,
     );
 
-    if (pickedFile != null) {
+    if (pickedFiles.isNotEmpty) {
+      final List<_PickedImage> newImages = [];
+      for (final xfile in pickedFiles) {
+        final bytes = await xfile.readAsBytes();
+        final ext = xfile.name.split('.').last;
+        newImages.add(_PickedImage(bytes: bytes, ext: ext));
+      }
       setState(() {
-        _selectedImage = File(pickedFile.path);
+        _newImages.addAll(newImages);
       });
     }
   }
 
-  void _removeImage() {
+  void _removeExistingImage(int index) {
     setState(() {
-      _selectedImage = null;
-      _currentImageUrl = null;
+      _existingImageUrls.removeAt(index);
+    });
+  }
+
+  void _removeNewImage(int index) {
+    setState(() {
+      _newImages.removeAt(index);
     });
   }
 
@@ -90,18 +107,24 @@ class _EditBlogScreenState extends State<EditBlogScreen> {
     });
 
     try {
-      String? imageUrl = _currentImageUrl;
+      List<String> allUrls = List.from(_existingImageUrls);
 
-      if (_selectedImage != null) {
-        imageUrl = await _storageService.uploadImage(_selectedImage!);
-        if (imageUrl == null) {
+      if (_newImages.isNotEmpty) {
+        final uploads = _newImages
+            .map((img) => (bytes: img.bytes, ext: img.ext))
+            .toList();
+        final uploadedUrls = await _storageService.uploadMultipleImages(uploads);
+        if (uploadedUrls == null) {
           setState(() {
-            _errorMessage = '❌ Failed to upload image. Please try again.';
+            _errorMessage = '❌ Failed to upload images. Please try again.';
             _isSaving = false;
           });
           return;
         }
+        allUrls.addAll(uploadedUrls);
       }
+
+      final imageUrl = Post.encodeImageUrls(allUrls);
 
       await _blogService.updateBlog(
         id: widget.blogId,
@@ -127,6 +150,123 @@ class _EditBlogScreenState extends State<EditBlogScreen> {
         });
       }
     }
+  }
+
+  Widget _buildImageGrid() {
+    final totalImages = _existingImageUrls.length + _newImages.length;
+
+    return Column(
+      children: [
+        if (totalImages > 0)
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+            ),
+            itemCount: totalImages,
+            itemBuilder: (context, index) {
+              final isExisting = index < _existingImageUrls.length;
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: isExisting
+                        ? Image.network(
+                            _existingImageUrls[index],
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                color: const Color(0xFFE2E8F0),
+                                child: const Center(
+                                  child: Icon(Icons.image_not_supported,
+                                      color: Color(0xFF718096)),
+                                ),
+                              );
+                            },
+                          )
+                        : Image.memory(
+                            _newImages[index - _existingImageUrls.length].bytes,
+                            fit: BoxFit.cover,
+                          ),
+                  ),
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: GestureDetector(
+                      onTap: () => isExisting
+                          ? _removeExistingImage(index)
+                          : _removeNewImage(index - _existingImageUrls.length),
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.close,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: _pickImages,
+          child: Container(
+            height: totalImages == 0 ? 150 : 60,
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: const Color(0xFFE2E8F0),
+                width: 2,
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Center(
+              child: totalImages == 0
+                  ? const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.add_photo_alternate_outlined,
+                          size: 40,
+                          color: Color(0xFF718096),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'Tap to add images',
+                          style: TextStyle(color: Color(0xFF718096)),
+                        ),
+                      ],
+                    )
+                  : const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.add_photo_alternate_outlined,
+                          size: 24,
+                          color: Color(0xFF718096),
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Add more images',
+                          style: TextStyle(color: Color(0xFF718096)),
+                        ),
+                      ],
+                    ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -237,136 +377,14 @@ class _EditBlogScreenState extends State<EditBlogScreen> {
                           const SizedBox(height: 20),
 
                           const Text(
-                            'Blog Image',
+                            'Blog Images',
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               color: Color(0xFF2D3748),
                             ),
                           ),
                           const SizedBox(height: 8),
-                          if (_selectedImage != null)
-                            Stack(
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Image.file(
-                                    _selectedImage!,
-                                    height: 200,
-                                    width: double.infinity,
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                                Positioned(
-                                  top: 8,
-                                  right: 8,
-                                  child: GestureDetector(
-                                    onTap: _removeImage,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(4),
-                                      decoration: const BoxDecoration(
-                                        color: Colors.red,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.close,
-                                        color: Colors.white,
-                                        size: 20,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            )
-                          else if (_currentImageUrl != null && _currentImageUrl!.isNotEmpty)
-                            Stack(
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Image.network(
-                                    _currentImageUrl!,
-                                    height: 200,
-                                    width: double.infinity,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Container(
-                                        height: 200,
-                                        color: const Color(0xFFE2E8F0),
-                                        child: const Center(
-                                          child: Icon(
-                                            Icons.image_not_supported,
-                                            size: 50,
-                                            color: Color(0xFF718096),
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                                Positioned(
-                                  top: 8,
-                                  right: 8,
-                                  child: GestureDetector(
-                                    onTap: _removeImage,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(4),
-                                      decoration: const BoxDecoration(
-                                        color: Colors.red,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.close,
-                                        color: Colors.white,
-                                        size: 20,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            )
-                          else
-                            GestureDetector(
-                              onTap: _pickImage,
-                              child: Container(
-                                height: 150,
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: const Color(0xFFE2E8F0),
-                                    width: 2,
-                                  ),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.add_photo_alternate_outlined,
-                                        size: 40,
-                                        color: Color(0xFF718096),
-                                      ),
-                                      SizedBox(height: 8),
-                                      Text(
-                                        'Tap to add an image',
-                                        style: TextStyle(
-                                          color: Color(0xFF718096),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          if (_selectedImage == null && (_currentImageUrl == null || _currentImageUrl!.isEmpty))
-                            const SizedBox()
-                          else
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: TextButton.icon(
-                                onPressed: _pickImage,
-                                icon: const Icon(Icons.refresh),
-                                label: const Text('Change Image'),
-                              ),
-                            ),
+                          _buildImageGrid(),
                           const SizedBox(height: 20),
 
                           const Text(

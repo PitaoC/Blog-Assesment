@@ -2,8 +2,14 @@ import 'package:flutter/material.dart';
 import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 
+class _PickedImage {
+  final Uint8List bytes;
+  final String ext;
+  _PickedImage({required this.bytes, required this.ext});
+}
+
 class AddComment extends StatefulWidget {
-  final Future<void> Function(String content, String authorName, Uint8List? imageBytes, String? imageExt) onSubmit;
+  final Future<void> Function(String content, String authorName, List<({Uint8List bytes, String ext})> images) onSubmit;
   final bool isLoading;
   final bool isLoggedIn;
   final String? defaultAuthorName;
@@ -24,8 +30,7 @@ class _AddCommentState extends State<AddComment> {
   final _contentController = TextEditingController();
   final _nameController = TextEditingController();
   final ImagePicker _imagePicker = ImagePicker();
-  Uint8List? _selectedImageBytes;
-  String? _selectedImageExt;
+  List<_PickedImage> _selectedImages = [];
 
   @override
   void initState() {
@@ -42,28 +47,29 @@ class _AddCommentState extends State<AddComment> {
     super.dispose();
   }
 
-  Future<void> _pickImage() async {
-    final pickedFile = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
+  Future<void> _pickImages() async {
+    final pickedFiles = await _imagePicker.pickMultiImage(
       maxWidth: 800,
       maxHeight: 800,
       imageQuality: 80,
     );
 
-    if (pickedFile != null) {
-      final bytes = await pickedFile.readAsBytes();
-      final ext = pickedFile.name.split('.').last;
+    if (pickedFiles.isNotEmpty) {
+      final List<_PickedImage> newImages = [];
+      for (final xfile in pickedFiles) {
+        final bytes = await xfile.readAsBytes();
+        final ext = xfile.name.split('.').last;
+        newImages.add(_PickedImage(bytes: bytes, ext: ext));
+      }
       setState(() {
-        _selectedImageBytes = bytes;
-        _selectedImageExt = ext;
+        _selectedImages.addAll(newImages);
       });
     }
   }
 
-  void _removeImage() {
+  void _removeImage(int index) {
     setState(() {
-      _selectedImageBytes = null;
-      _selectedImageExt = null;
+      _selectedImages.removeAt(index);
     });
   }
 
@@ -81,12 +87,15 @@ class _AddCommentState extends State<AddComment> {
     }
 
     try {
-      await widget.onSubmit(content, authorName, _selectedImageBytes, _selectedImageExt);
+      await widget.onSubmit(
+        content,
+        authorName,
+        _selectedImages.map((img) => (bytes: img.bytes, ext: img.ext)).toList(),
+      );
       _contentController.clear();
       _nameController.clear();
       setState(() {
-        _selectedImageBytes = null;
-        _selectedImageExt = null;
+        _selectedImages = [];
       });
     } catch (_) {
       // Silently ignored - comment submission handled by parent
@@ -152,40 +161,51 @@ class _AddCommentState extends State<AddComment> {
             ),
           ),
 
-          if (_selectedImageBytes != null)
+          if (_selectedImages.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 12),
-              child: Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.memory(
-                      _selectedImageBytes!,
-                      height: 120,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  Positioned(
-                    top: 4,
-                    right: 4,
-                    child: GestureDetector(
-                      onTap: _removeImage,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.close,
-                          color: Colors.white,
-                          size: 16,
+              child: GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 6,
+                  mainAxisSpacing: 6,
+                ),
+                itemCount: _selectedImages.length,
+                itemBuilder: (context, index) {
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.memory(
+                          _selectedImages[index].bytes,
+                          fit: BoxFit.cover,
                         ),
                       ),
-                    ),
-                  ),
-                ],
+                      Positioned(
+                        top: 2,
+                        right: 2,
+                        child: GestureDetector(
+                          onTap: () => _removeImage(index),
+                          child: Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.close,
+                              color: Colors.white,
+                              size: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
 
@@ -196,9 +216,9 @@ class _AddCommentState extends State<AddComment> {
             children: [
               Flexible(
                 child: TextButton.icon(
-                  onPressed: _pickImage,
+                  onPressed: _pickImages,
                   icon: const Icon(Icons.image_outlined, size: 20),
-                  label: const Text('Add Image'),
+                  label: Text(_selectedImages.isNotEmpty ? 'Add More' : 'Add Images'),
                   style: TextButton.styleFrom(
                     foregroundColor: const Color(0xFF718096),
                   ),
