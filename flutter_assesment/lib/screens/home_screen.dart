@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/post.dart';
+import '../models/user_profile.dart';
 import '../widgets/post_card.dart';
+import '../widgets/user_avatar.dart';
 import '../services/blog_service.dart';
 import '../services/auth_service.dart';
+import '../services/profile_service.dart';
 import 'login_screen.dart';
 import 'view_blog_screen.dart';
 import 'create_screen.dart';
@@ -21,17 +24,21 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final BlogService _blogService = BlogService();
   final AuthService _authService = AuthService();
+  final ProfileService _profileService = ProfileService();
   List<Post> _blogs = [];
   bool _isLoading = true;
   String? _error;
+  UserProfile? _userProfile;
   late final StreamSubscription<AuthState> _authSub;
 
   @override
   void initState() {
     super.initState();
     _loadBlogs();
+    _loadUserProfile();
     _authSub = _authService.authStateChanges.listen((_) {
       if (mounted) {
+        _loadUserProfile();
         setState(() {});
       }
     });
@@ -41,6 +48,28 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _authSub.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadUserProfile() async {
+    final user = _authService.currentUser;
+    if (user == null) {
+      setState(() => _userProfile = null);
+      return;
+    }
+    try {
+      final profile = await _profileService.getUserProfile(user.id);
+      if (mounted) {
+        setState(() => _userProfile = profile);
+      }
+    } catch (_) {}
+  }
+
+  String _getDisplayName() {
+    if (_userProfile?.displayName != null && _userProfile!.displayName!.isNotEmpty) {
+      return _userProfile!.displayName!;
+    }
+    final email = _authService.currentUser?.email ?? '';
+    return email.split('@').first;
   }
 
   Future<void> _loadBlogs() async {
@@ -129,15 +158,41 @@ class _HomeScreenState extends State<HomeScreen> {
         automaticallyImplyLeading: false,
         backgroundColor: const Color(0xFF5A67D8),
         foregroundColor: Colors.white,
+        leadingWidth: currentUser != null ? 160 : null,
         leading: currentUser != null
-            ? IconButton(
-                icon: const Icon(Icons.person),
-                onPressed: () async {
+            ? InkWell(
+                onTap: () async {
                   await Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const ProfileScreen()),
                   );
+                  _loadUserProfile();
                   _loadBlogs();
                 },
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 12),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      UserAvatar(
+                        photoUrl: _userProfile?.photoUrl,
+                        name: _getDisplayName(),
+                        size: 32,
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          _getDisplayName(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               )
             : null,
         title: const Text('📝 BlogHub'),
