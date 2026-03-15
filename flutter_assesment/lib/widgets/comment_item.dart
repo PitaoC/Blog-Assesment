@@ -169,71 +169,137 @@ class _CommentItemState extends State<CommentItem> {
   void _showFullImage(String imageUrl, {int initialIndex = 0}) {
     final urls = widget.comment.imageUrls;
     final allUrls = urls.isNotEmpty ? urls : [imageUrl];
+    final pageController = PageController(initialPage: initialIndex);
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: EdgeInsets.zero,
-        child: Stack(
-          children: [
-            Center(
-              child: allUrls.length > 1
-                  ? PageView.builder(
-                      controller: PageController(initialPage: initialIndex),
-                      itemCount: allUrls.length,
-                      itemBuilder: (context, index) {
-                        return InteractiveViewer(
-                          child: Center(
-                            child: Image.network(
-                              allUrls[index],
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) {
-                                return const Icon(Icons.image_not_supported, size: 60, color: Colors.white54);
-                              },
-                            ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          int currentIndex = pageController.hasClients
+              ? (pageController.page?.round() ?? initialIndex)
+              : initialIndex;
+
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: EdgeInsets.zero,
+            child: Stack(
+              children: [
+                Center(
+                  child: allUrls.length > 1
+                      ? PageView.builder(
+                          controller: pageController,
+                          itemCount: allUrls.length,
+                          onPageChanged: (index) {
+                            setDialogState(() {});
+                          },
+                          itemBuilder: (context, index) {
+                            return InteractiveViewer(
+                              child: Center(
+                                child: Image.network(
+                                  allUrls[index],
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return const Icon(Icons.image_not_supported, size: 60, color: Colors.white54);
+                                  },
+                                ),
+                              ),
+                            );
+                          },
+                        )
+                      : InteractiveViewer(
+                          child: Image.network(
+                            imageUrl,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Icon(Icons.image_not_supported, size: 60, color: Colors.white54);
+                            },
                           ),
-                        );
-                      },
-                    )
-                  : InteractiveViewer(
-                      child: Image.network(
-                        imageUrl,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Icon(Icons.image_not_supported, size: 60, color: Colors.white54);
-                        },
-                      ),
-                    ),
-            ),
-            Positioned(
-              top: 40,
-              right: 16,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white, size: 30),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ),
-            if (allUrls.length > 1)
-              Positioned(
-                bottom: 40,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Text(
-                      'Swipe to view ${allUrls.length} photos',
-                      style: const TextStyle(color: Colors.white, fontSize: 13),
-                    ),
+                        ),
+                ),
+                Positioned(
+                  top: 40,
+                  right: 16,
+                  child: IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                    onPressed: () => Navigator.pop(context),
                   ),
                 ),
-              ),
-          ],
-        ),
+                if (allUrls.length > 1) ...[
+                  // Previous button
+                  if (currentIndex > 0)
+                    Positioned(
+                      left: 8,
+                      top: 0,
+                      bottom: 0,
+                      child: Center(
+                        child: IconButton(
+                          iconSize: 40,
+                          icon: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: const BoxDecoration(
+                              color: Colors.black54,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.chevron_left, color: Colors.white, size: 28),
+                          ),
+                          onPressed: () {
+                            pageController.previousPage(
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeInOut,
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  // Next button
+                  if (currentIndex < allUrls.length - 1)
+                    Positioned(
+                      right: 8,
+                      top: 0,
+                      bottom: 0,
+                      child: Center(
+                        child: IconButton(
+                          iconSize: 40,
+                          icon: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: const BoxDecoration(
+                              color: Colors.black54,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.chevron_right, color: Colors.white, size: 28),
+                          ),
+                          onPressed: () {
+                            pageController.nextPage(
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeInOut,
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  // Page indicator
+                  Positioned(
+                    bottom: 40,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(
+                          '${currentIndex + 1} / ${allUrls.length}',
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
       ),
     );
   }
